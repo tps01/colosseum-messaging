@@ -9,6 +9,7 @@ from colosseum.resource_cache import cached_resource, close_cached_resources
 from colosseum_messaging.http.client import HttpClientWrapper
 from colosseum_messaging.mqtt.client import MqttClientWrapper
 from colosseum_messaging.redis.client import RedisClientWrapper
+from colosseum_messaging.ssh.client import SSHClientWrapper
 from colosseum_messaging.zmq.client import ZmqClientWrapper
 
 _logger = logging.getLogger("colosseum.messaging")
@@ -116,6 +117,29 @@ def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
     )
 
 
+def get_ssh_client(ssh_id: int) -> SSHClientWrapper:
+    ctx = require_context()
+    key = f"messaging:ssh:{ssh_id}"
+    cfg = _require_config_item("messaging.ssh", ssh_id)
+    driver = str(cfg.get("driver", "ssh")).lower()
+
+    def _open() -> SSHClientWrapper:
+        return SSHClientWrapper(cfg)
+
+    return cached_resource(
+        ctx.resource_cache,
+        key,
+        _open,
+        on_reuse=lambda: _logger.debug("Reusing cached SSH client messaging.ssh id=%s", ssh_id),
+        on_open=lambda: _logger.debug(
+            "Opening SSH client messaging.ssh id=%s driver=%s host=%s",
+            ssh_id,
+            driver,
+            cfg.get("host"),
+        ),
+    )
+
+
 def close_all() -> None:
     ctx = require_context()
     close_cached_resources(
@@ -126,6 +150,7 @@ def close_all() -> None:
                 "messaging:redis:",
                 "messaging:zmq:",
                 "messaging:mqtt:",
+                "messaging:ssh:",
             ),
         ),
         logger=_logger,

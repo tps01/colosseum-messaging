@@ -1,8 +1,8 @@
-"""Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT)."""
+"""Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH)."""
 
 __colosseum_domain__ = "messaging"
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from colosseum.config.sections import ConfigSectionSpec
 from colosseum.plugins.registry import PluginRegistry
@@ -53,5 +53,13 @@ def register(registry: PluginRegistry) -> None:
                 "keepalive",
                 "driver",
             ),
+        )
+    )
+    registry.register_config_section(
+        ConfigSectionSpec(
+            "messaging.ssh",
+            "ssh_id",
+            required_keys=("host", "username"),
+            optional_keys=("port", "password", "key_filename", "timeout", "driver", "auth"),
         )
     )

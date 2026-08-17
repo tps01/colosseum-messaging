@@ -1,4 +1,4 @@
-"""I-MSG: messaging HTTP/Redis/ZMQ/MQTT on sim."""
+"""I-MSG: messaging HTTP/Redis/ZMQ/MQTT/SSH on sim."""
 
 from __future__ import annotations
 
@@ -40,6 +40,11 @@ def test_messaging_send_receive_verify(
     col.messaging.mqtt.publish(mqtt_id=1, topic="device/cmd", payload="on")
     col.messaging.mqtt.receive(mqtt_id=1, key="mqtt_msg", topic="device/#")
     assert col.messaging.mqtt.verify_payload_match(key="mqtt_msg", pattern=r"^on$").status == "PASS"
+
+    out = col.messaging.ssh.measure_stdout(
+        ssh_id=1, command="cat /etc/version", key="uut_version"
+    )
+    assert "v1.2.3" in out
 
     with pytest.raises(SystemExit) as exc_info:
         col.endex()

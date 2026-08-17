@@ -1,5 +1,5 @@
 """
-Example: messaging plugin sim smoke (HTTP, Redis, ZMQ, MQTT).
+Example: messaging plugin sim smoke (HTTP, Redis, ZMQ, MQTT, SSH).
 
 Run:
   python examples/test_messaging_sim.py
@@ -40,6 +40,8 @@ def main() -> None:
     col.messaging.mqtt.publish(mqtt_id=1, topic="device/cmd", payload="on")
     col.messaging.mqtt.receive(mqtt_id=1, key="mqtt_msg", topic="device/#")
     col.messaging.mqtt.verify_payload_match(key="mqtt_msg", pattern=r"^on$")
+
+    col.messaging.ssh.measure_stdout(ssh_id=1, command="cat /etc/version", key="uut_version")
 
 
 if __name__ == "__main__":
