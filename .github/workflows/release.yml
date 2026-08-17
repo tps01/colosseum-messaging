@@ -1,0 +1,119 @@
+# Tag vX.Y.Z on main (or workflow_dispatch for artifacts only).
+# Thin orchestration: real logic lives in scripts/ci/ (GHA/Bamboo agnostic).
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-sdist-wheel:
+    name: sdist and wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build distributions
+        run: python scripts/ci/build_dist.py
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: colosseum-messaging-dist
+          path: dist/*
+          if-no-files-found: error
+
+  build-offline-wheelhouse:
+    name: offline (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: colosseum-messaging
+      - uses: actions/checkout@v7
+        with:
+          repository: tps01/colosseum-core
+          ref: develop
+          path: colosseum-core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Build offline wheelhouse zip
+        working-directory: colosseum-messaging
+        run: >
+          python scripts/ci/build_offline_wheelhouse.py
+          --also-build ../colosseum-core
+          --zip
+      - name: Upload offline wheelhouse
+        uses: actions/upload-artifact@v7
+        with:
+          name: offline-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: colosseum-messaging/colosseum-messaging-offline-*.zip
+          if-no-files-found: error
+
+  publish:
+    name: publish GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [build-sdist-wheel, build-offline-wheelhouse]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify tag matches pyproject version
+        run: python scripts/ci/verify_release_tag.py
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+
+      - name: Flatten release files
+        run: |
+          mkdir -p release-files
+          find release-assets -type f \( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' \) \
+            -exec cp -t release-files {} +
+          ls -la release-files
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Colosseum Messaging ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## Install (online)
+
+            ```bash
+            pip install colosseum-messaging
+            ```
+
+            ## Offline wheelhouses
+
+            Zips include `colosseum-core` plus third-party deps:
+
+            - `colosseum-messaging-offline-linux-py{3.9,3.12}.zip`
+            - `colosseum-messaging-offline-windows-py{3.9,3.12}.zip`
+
+            ```bash
+            unzip colosseum-messaging-offline-<os>-py<ver>.zip -d wheelhouse
+            python -m pip install --no-index --find-links=wheelhouse colosseum-messaging
+            ```
+          files: release-files/*
+          fail_on_unmatched_files: true

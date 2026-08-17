@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: pytest and static (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: colosseum-messaging
+      - uses: actions/checkout@v7
+        with:
+          repository: tps01/colosseum-core
+          ref: develop
+          path: colosseum-core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        working-directory: colosseum-messaging
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ../colosseum-core
+          python -m pip install -e ".[test,static]"
+      - name: Test
+        working-directory: colosseum-messaging
+        run: python -m pytest -q
+      - name: Static
+        working-directory: colosseum-messaging
+        run: |
+          ruff check .
+          mypy
+      - name: Build distribution
+        if: matrix.python-version == '3.12'
+        working-directory: colosseum-messaging
+        run: |
+          python -m pip install build
+          python -m build
+      - name: Smoke-test default wheel install
+        if: matrix.python-version == '3.12'
+        working-directory: colosseum-messaging
+        run: |
+          python -m venv .package-venv
+          .package-venv/bin/pip install ../colosseum-core
+          .package-venv/bin/pip install dist/*.whl
+          .package-venv/bin/python -c "import colosseum_messaging, redis, zmq, paho.mqtt.client"

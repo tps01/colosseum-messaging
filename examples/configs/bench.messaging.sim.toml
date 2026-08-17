@@ -1,0 +1,32 @@
+# Messaging plugin sim config fragment
+
+[[messaging.http]]
+http_id = 1
+base_url = "http://127.0.0.1:8080"
+driver = "sim"
+
+[[messaging.redis]]
+redis_id = 1
+host = "127.0.0.1"
+port = 6379
+driver = "sim"
+
+[[messaging.zmq]]
+zmq_id = 1
+endpoint = "tcp://127.0.0.1:5555"
+socket = "pub"
+driver = "sim"
+
+[[messaging.zmq]]
+zmq_id = 2
+endpoint = "tcp://127.0.0.1:5555"
+socket = "sub"
+topic = ""
+driver = "sim"
+
+[[messaging.mqtt]]
+mqtt_id = 1
+host = "127.0.0.1"
+port = 1883
+topic = "device/#"
+driver = "sim"

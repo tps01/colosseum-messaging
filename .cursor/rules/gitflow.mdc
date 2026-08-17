@@ -1,0 +1,14 @@
+---
+description: Gitflow and change-management policy
+alwaysApply: true
+---
+
+# Gitflow
+
+- `main` is release-only; do not use it for routine development.
+- `develop` is the integration branch and default base for work.
+- Create `feature/*` and `fix/*` branches from `develop`; target their pull requests to `develop`.
+- Release by merging `develop` into `main`, then tag the release on `main`.
+- Create `hotfix/*` from `main`; merge completed hotfixes into both `main` and `develop`.
+- Keep pull requests focused, reviewable, and limited to one coherent concern.
+- Agents must not commit, push, merge, tag, or publish without an explicit user request.
