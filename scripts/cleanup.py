@@ -39,6 +39,8 @@ ROOT_DIRS = (
     "sdist",
     "var",
     "wheels",
+    "wheelhouse",
+    "offline-bundle",
     "share/python-wheels",
     "pip-wheel-metadata",
     "htmlcov",
@@ -148,6 +150,9 @@ def _collect_paths(
         path = root / name
         if path.exists():
             targets.append(path)
+
+    for pattern in ("*-offline-*.zip", "colosseum-*-offline-*.tar.gz"):
+        targets.extend(path for path in root.glob(pattern) if path.is_file())
 
     if keep_venvs:
         targets.extend(_collect_venv_artifacts(root))
@@ -268,6 +273,14 @@ def main(argv: list[str] | None = None) -> int:
 
     for path in targets:
         _remove(path, dry_run=False)
+
+    leftover = [path for path in targets if path.exists()]
+    if leftover:
+        print("\nCleanup incomplete; could not remove:")
+        for path in leftover:
+            print(f"  {path.relative_to(root)}")
+        return 1
+
     print("\nCleanup complete.")
     return 0
 
