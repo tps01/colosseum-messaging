@@ -5,15 +5,19 @@ __colosseum_domain__ = "messaging"
 __version__ = "0.2.0"
 
 from colosseum.config.sections import ConfigSectionSpec
+from colosseum.logging import get_logger
 from colosseum.plugins.registry import PluginRegistry
 
 from colosseum_messaging.connections import close_all
+
+_logger = get_logger("colosseum.messaging")
 
 
 def register(registry: PluginRegistry) -> None:
     from colosseum_messaging import api
 
     registry.register_namespace("messaging", api)
+    _logger.debug("Registered col.messaging namespace")
     registry.register_shutdown(close_all)
     registry.register_config_section(
         ConfigSectionSpec(

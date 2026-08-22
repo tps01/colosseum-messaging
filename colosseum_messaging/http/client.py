@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-import logging
 import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from urllib.parse import urljoin
 
-_logger = logging.getLogger("colosseum.messaging.http")
+from colosseum.logging import get_logger
+
+_logger = get_logger("colosseum.messaging.http")
 
 
 class HttpClientWrapper:

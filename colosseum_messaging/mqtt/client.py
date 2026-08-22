@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import logging
 import queue
 import time
 import uuid
 from collections.abc import Mapping
 
 import paho.mqtt.client as mqtt
+from colosseum.logging import get_logger
 
 from colosseum_messaging.sim import SIM_MAILBOX
 
-_logger = logging.getLogger("colosseum.messaging.mqtt")
+_logger = get_logger("colosseum.messaging.mqtt")
 
 
 class MqttClientWrapper:

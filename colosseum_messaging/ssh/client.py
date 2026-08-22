@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
 
 import paramiko
+from colosseum.logging import get_logger
 
-_logger = logging.getLogger("colosseum.messaging.ssh")
+_logger = get_logger("colosseum.messaging.ssh")
 
 
 class SSHClientWrapper:

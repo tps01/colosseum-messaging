@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import logging
-
 from colosseum.config.loader import ConfigError
 from colosseum.context import require_context
+from colosseum.logging import get_logger
 from colosseum.resource_cache import cached_resource, close_cached_resources
 
 from colosseum_messaging.http.client import HttpClientWrapper
@@ -12,7 +11,7 @@ from colosseum_messaging.redis.client import RedisClientWrapper
 from colosseum_messaging.ssh.client import SSHClientWrapper
 from colosseum_messaging.zmq.client import ZmqClientWrapper
 
-_logger = logging.getLogger("colosseum.messaging")
+_logger = get_logger("colosseum.messaging")
 
 
 def _require_config_item(section: str, item_id: int) -> dict[str, object]:

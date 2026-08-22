@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
+
+from colosseum.logging import get_logger
 
 import redis
 from colosseum_messaging.sim import SIM_MAILBOX, sim_redis_get, sim_redis_set
 
-_logger = logging.getLogger("colosseum.messaging.redis")
+_logger = get_logger("colosseum.messaging.redis")
 
 
 class RedisClientWrapper:
