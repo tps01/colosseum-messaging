@@ -1,14 +1,19 @@
 """Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH)."""
 
-__colosseum_domain__ = "messaging"
-
-__version__ = "0.2.1"
+from importlib import metadata
 
 from colosseum.config.sections import ConfigSectionSpec
 from colosseum.logging import get_logger
 from colosseum.plugins.registry import PluginRegistry
 
 from colosseum_messaging.connections import close_all
+
+__colosseum_domain__ = "messaging"
+
+try:
+    __version__ = metadata.version("colosseum-messaging")
+except metadata.PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.0.0"
 
 _logger = get_logger("colosseum.messaging")
 

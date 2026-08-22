@@ -63,3 +63,4 @@ Only the following licenses are allowed:
 - Do not over-use helper functions or lambda functions. While they have a place, sometimes it's more clear to juse do a one-off operation in-line.
 - Avoid magic numbers. Instead define a variable with a semantic meaning, or just place a comment above it.
 - Do not overengineer. Not everything needs an entire supporting system. Minimizing the footprint of your code is paramount for human readability.
+- Do not add fallback mechanisms for everything. Elaborate error handling is often unnecessary.

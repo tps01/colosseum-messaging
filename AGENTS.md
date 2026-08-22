@@ -14,4 +14,4 @@ Prefer focused, compact changes. Do not commit unless asked. Read `RULES.md` at 
 
 ## Workflow
 
-When completing changes, increment the package version in `pyproject.toml` and `__version__` using semantic versioning. Agents cannot increment the major number.
+When completing changes, increment the package version in `pyproject.toml` using semantic versioning. Agents cannot increment the major number.
