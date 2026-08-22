@@ -31,9 +31,6 @@ static = [
 [project.entry-points."colosseum.plugins"]
 messaging = "colosseum_messaging:register"
 
-[project.entry-points."colosseum.docgen"]
-messaging = "colosseum_messaging.docgen_entry:spec"
-
 [tool.setuptools.packages.find]
 include = ["colosseum_messaging*"]
 

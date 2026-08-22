@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
 
 from colosseum.context import require_context
 from colosseum.decorators import (
-    MeasurementSource,
     VerificationResult,
     command,
     measurement,
@@ -71,24 +69,16 @@ def receive(*, redis_id: int, channel: str, key: str, timeout: float = 1.0) -> d
     return get_redis_client(redis_id).receive(channel, timeout=timeout)
 
 
-@verification(sources=[MeasurementSource(domain="messaging", command="redis.get")])
+@verification
 def verify_value_match(
     *,
     key: str,
     pattern: str,
     optional: bool = False,
-    sources: Sequence[MeasurementSource] | None = None,
 ) -> VerificationResult:
     """Verify a prior Redis ``get`` measurement matches a regex."""
-    source_list = list(sources or [MeasurementSource("messaging", "redis.get")])
-    actual = None
-    for source in source_list:
-        row = require_context().db.get_measurement(
-            source.domain, source.command, key, row_index=0
-        )
-        if row is not None and row.value is not None:
-            actual = str(row.value)
-            break
+    row = require_context().db.get_measurement("messaging", "redis.get", key, row_index=0)
+    actual = None if row is None or row.value is None else str(row.value)
     if actual is None:
         return missing_measurement_result(key=key, optional=optional)
     if re.search(pattern, actual):

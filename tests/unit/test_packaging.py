@@ -35,8 +35,4 @@ def test_plugin_entry_points_and_version_match_metadata() -> None:
     }
 
     assert entry_points[("colosseum.plugins", "messaging")] == "colosseum_messaging:register"
-    assert (
-        entry_points[("colosseum.docgen", "messaging")]
-        == "colosseum_messaging.docgen_entry:spec"
-    )
     assert colosseum_messaging.__version__ == metadata.version
