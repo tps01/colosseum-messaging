@@ -2,7 +2,7 @@
 
 __colosseum_domain__ = "messaging"
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from colosseum.config.sections import ConfigSectionSpec
 from colosseum.logging import get_logger
