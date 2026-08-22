@@ -12,7 +12,6 @@ _logger = get_logger("colosseum.messaging.redis")
 
 class RedisClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
         self._sim = str(config.get("driver", "redis")).lower() == "sim"
         self._client: redis.Redis | None = None
         self._pubsub: object | None = None

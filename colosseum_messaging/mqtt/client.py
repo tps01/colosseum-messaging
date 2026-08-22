@@ -15,7 +15,6 @@ _logger = get_logger("colosseum.messaging.mqtt")
 
 class MqttClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
         self._host = str(config["host"])
         self._port = int(str(config.get("port", 1883)))
         self._topic = str(config.get("topic", "#"))

@@ -12,7 +12,6 @@ _logger = get_logger("colosseum.messaging.zmq")
 
 class ZmqClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
         self._endpoint = str(config["endpoint"])
         self._socket_kind = str(config["socket"]).strip().lower()
         if self._socket_kind not in ("pub", "sub"):
