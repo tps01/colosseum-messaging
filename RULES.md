@@ -18,6 +18,7 @@ Only the following licenses are allowed:
 - X11 License
 - X License
 - MIT/X Consortium License
+- Historical Permission Notice and Disclaimer (HPND)
 - GNU Lesser General Public License (LGPL) — allowed only when used unmodified (no source modifications)
 - NASA Open Source Agreement 1.3
 - Public Domain
@@ -49,6 +50,16 @@ Only the following licenses are allowed:
 - `pyzmq` wheels bundle unmodified libzmq (LGPL).
 - `paramiko` is LGPL unmodified.
 
+
+## Packaging
+
+- Provide exactly one simple pip install that gets everything needed to develop
+  and run tests (for example `pip install -e .` or `pip install <this-package>`).
+- Do not split runtime drivers or developer/test tooling into optional extras
+  such as `[web]`, `[desktop]`, `[test]`, `[static]`, or `[docs]`. Put those
+  packages in the main `dependencies` list in `pyproject.toml`.
+- Platform- or Python-version environment markers on individual dependencies are
+  fine when a package only applies on that platform.
 
 ## Testing
 
