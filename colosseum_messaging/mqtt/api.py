@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import cast
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
     VerificationResult,
     command,
@@ -50,7 +50,7 @@ def receive(
 
 
 def _lookup_payload(key: str) -> object | None:
-    row = require_context().db.get_measurement(
+    row = get_context().db.get_measurement(
         "messaging", "mqtt.receive", key, row_index=0
     )
     if row is not None and row.value is not None:

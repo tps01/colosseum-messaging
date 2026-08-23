@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
     VerificationResult,
     command,
@@ -77,7 +77,7 @@ def verify_value_match(
     optional: bool = False,
 ) -> VerificationResult:
     """Verify a prior Redis ``get`` measurement matches a regex."""
-    row = require_context().db.get_measurement("messaging", "redis.get", key, row_index=0)
+    row = get_context().db.get_measurement("messaging", "redis.get", key, row_index=0)
     actual = None if row is None or row.value is None else str(row.value)
     if actual is None:
         return missing_measurement_result(key=key, optional=optional)

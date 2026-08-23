@@ -4,7 +4,7 @@ import re
 from collections.abc import Mapping
 from typing import cast
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
     VerificationResult,
     measurement,
@@ -171,7 +171,7 @@ def delete(
 
 
 def _lookup_http_measurement(key: str) -> object | None:
-    ctx = require_context()
+    ctx = get_context()
     for command in _HTTP_COMMANDS:
         row = ctx.db.get_measurement("messaging", command, key, row_index=0)
         if row is not None and row.value is not None:

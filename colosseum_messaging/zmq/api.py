@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import cast
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
     VerificationResult,
     command,
@@ -43,7 +43,7 @@ def receive(*, zmq_id: int, key: str, timeout: float = 1.0) -> dict[str, str]:
 
 
 def _lookup_payload(key: str, commands: tuple[str, ...]) -> object | None:
-    ctx = require_context()
+    ctx = get_context()
     for command_name in commands:
         row = ctx.db.get_measurement("messaging", command_name, key, row_index=0)
         if row is not None and row.value is not None:
