@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
+
+from colosseum.logging import get_logger
 
 import zmq
 from colosseum_messaging.sim import SIM_MAILBOX
 
-_logger = logging.getLogger("colosseum.messaging.zmq")
+_logger = get_logger("colosseum.messaging.zmq")
 
 
 class ZmqClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
         self._endpoint = str(config["endpoint"])
         self._socket_kind = str(config["socket"]).strip().lower()
         if self._socket_kind not in ("pub", "sub"):

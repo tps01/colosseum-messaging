@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colosseum-messaging"
-version = "0.1.0"
-description = "Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT)"
+version = "0.2.2"
+description = "Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
@@ -15,6 +15,7 @@ dependencies = [
   "redis>=5,<6",
   "pyzmq>=26,<27",
   "paho-mqtt>=2,<3",
+  "paramiko>=3.0,<4",
 ]
 
 [project.optional-dependencies]
@@ -24,13 +25,11 @@ static = [
   "vulture>=2.11",
   "ruff>=0.8",
   "mypy>=1.11",
+  "types-paramiko",
 ]
 
 [project.entry-points."colosseum.plugins"]
 messaging = "colosseum_messaging:register"
-
-[project.entry-points."colosseum.docgen"]
-messaging = "colosseum_messaging.docgen_entry:spec"
 
 [tool.setuptools.packages.find]
 include = ["colosseum_messaging*"]
@@ -66,7 +65,7 @@ warn_unused_ignores = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = ["redis.*", "zmq.*", "paho.*", "pytest", "tomli"]
+module = ["redis.*", "zmq.*", "paho.*", "paramiko.*", "pytest", "tomli"]
 ignore_missing_imports = true
 
 [tool.bandit]

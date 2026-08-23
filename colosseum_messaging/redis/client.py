@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
+
+from colosseum.logging import get_logger
 
 import redis
 from colosseum_messaging.sim import SIM_MAILBOX, sim_redis_get, sim_redis_set
 
-_logger = logging.getLogger("colosseum.messaging.redis")
+_logger = get_logger("colosseum.messaging.redis")
 
 
 class RedisClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
         self._sim = str(config.get("driver", "redis")).lower() == "sim"
         self._client: redis.Redis | None = None
         self._pubsub: object | None = None

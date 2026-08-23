@@ -47,9 +47,20 @@ Only the following licenses are allowed:
 - HTTP uses stdlib `urllib.request` (no `httpx`/`requests`/`certifi`).
 - `paho-mqtt` is dual-licensed EPL-2.0 OR EDL-1.0; this project consumes it under **EDL-1.0** (BSD-3 equivalent).
 - `pyzmq` wheels bundle unmodified libzmq (LGPL).
+- `paramiko` is LGPL unmodified.
 
 
-## Unit Testing
+## Testing
 
 - Only write high value unit tests.
 - Do not prioritize code coverage for the sake of coverage. Better coverage can be achieved by keeping the project small and maintainable.
+- Static analysis does not need to apply to support scripts or tests. That level of meta-testing is not needed for this project.
+
+
+## Code Quality
+
+- Do not stub out planned features; that's pointless. This applies to code infrastructure, tests, exceptions, etc.
+- Do not over-use helper functions or lambda functions. While they have a place, sometimes it's more clear to juse do a one-off operation in-line.
+- Avoid magic numbers. Instead define a variable with a semantic meaning, or just place a comment above it.
+- Do not overengineer. Not everything needs an entire supporting system. Minimizing the footprint of your code is paramount for human readability.
+- Do not add fallback mechanisms for everything. Elaborate error handling is often unnecessary.

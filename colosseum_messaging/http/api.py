@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from typing import cast
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
-    MeasurementSource,
     VerificationResult,
     measurement,
     missing_measurement_result,
@@ -171,24 +171,22 @@ def delete(
 
 
 def _lookup_http_measurement(key: str) -> object | None:
-    ctx = require_context()
+    ctx = get_context()
     for command in _HTTP_COMMANDS:
         row = ctx.db.get_measurement("messaging", command, key, row_index=0)
         if row is not None and row.value is not None:
-            return row.value
+            return cast(object, row.value)
     return None
 
 
-@verification()
+@verification
 def verify_status(
     *,
     key: str,
     expected: int,
     optional: bool = False,
-    sources: Sequence[MeasurementSource] | None = None,
 ) -> VerificationResult:
     """Verify a prior HTTP measurement has the expected status code."""
-    _ = sources
     value = _lookup_http_measurement(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
@@ -210,16 +208,14 @@ def verify_status(
     )
 
 
-@verification()
+@verification
 def verify_body_match(
     *,
     key: str,
     pattern: str,
     optional: bool = False,
-    sources: Sequence[MeasurementSource] | None = None,
 ) -> VerificationResult:
     """Verify a prior HTTP measurement body matches a regex."""
-    _ = sources
     value = _lookup_http_measurement(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)

@@ -27,10 +27,6 @@ class _MailboxStore:
                 return None
             time.sleep(0.01)
 
-    def clear(self) -> None:
-        with self._lock:
-            self._queues.clear()
-
 
 SIM_MAILBOX = _MailboxStore()
 

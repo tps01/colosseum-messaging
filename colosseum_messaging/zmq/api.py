@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from typing import cast
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
-    MeasurementSource,
     VerificationResult,
     command,
     measurement,
@@ -44,24 +43,22 @@ def receive(*, zmq_id: int, key: str, timeout: float = 1.0) -> dict[str, str]:
 
 
 def _lookup_payload(key: str, commands: tuple[str, ...]) -> object | None:
-    ctx = require_context()
+    ctx = get_context()
     for command_name in commands:
         row = ctx.db.get_measurement("messaging", command_name, key, row_index=0)
         if row is not None and row.value is not None:
-            return row.value
+            return cast(object, row.value)
     return None
 
 
-@verification(sources=[MeasurementSource(domain="messaging", command="zmq.receive")])
+@verification
 def verify_payload_match(
     *,
     key: str,
     pattern: str,
     optional: bool = False,
-    sources: Sequence[MeasurementSource] | None = None,
 ) -> VerificationResult:
     """Verify a prior ZMQ ``receive`` payload matches a regex."""
-    _ = sources
     value = _lookup_payload(key, ("zmq.receive",))
     if value is None:
         return missing_measurement_result(key=key, optional=optional)

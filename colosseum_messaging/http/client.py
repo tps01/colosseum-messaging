@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import json
-import logging
 import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from urllib.parse import urljoin
 
-_logger = logging.getLogger("colosseum.messaging.http")
+from colosseum.logging import get_logger
+
+_logger = get_logger("colosseum.messaging.http")
 
 
 class HttpClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
         self._base_url = str(config["base_url"]).rstrip("/") + "/"
         self._timeout = float(str(config.get("timeout", 10.0)))
         self._verify_tls = bool(config.get("verify_tls", True))

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from typing import cast
 
-from colosseum.context import require_context
+from colosseum.context import get_context
 from colosseum.decorators import (
-    MeasurementSource,
     VerificationResult,
     command,
     measurement,
@@ -51,24 +50,22 @@ def receive(
 
 
 def _lookup_payload(key: str) -> object | None:
-    row = require_context().db.get_measurement(
+    row = get_context().db.get_measurement(
         "messaging", "mqtt.receive", key, row_index=0
     )
     if row is not None and row.value is not None:
-        return row.value
+        return cast(object, row.value)
     return None
 
 
-@verification(sources=[MeasurementSource(domain="messaging", command="mqtt.receive")])
+@verification
 def verify_payload_match(
     *,
     key: str,
     pattern: str,
     optional: bool = False,
-    sources: Sequence[MeasurementSource] | None = None,
 ) -> VerificationResult:
     """Verify a prior MQTT ``receive`` payload matches a regex."""
-    _ = sources
     value = _lookup_payload(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)

@@ -1,28 +1,28 @@
 from __future__ import annotations
 
-import logging
-
 from colosseum.config.loader import ConfigError
-from colosseum.context import require_context
+from colosseum.context import get_context
+from colosseum.logging import get_logger
 from colosseum.resource_cache import cached_resource, close_cached_resources
 
 from colosseum_messaging.http.client import HttpClientWrapper
 from colosseum_messaging.mqtt.client import MqttClientWrapper
 from colosseum_messaging.redis.client import RedisClientWrapper
+from colosseum_messaging.ssh.client import SSHClientWrapper
 from colosseum_messaging.zmq.client import ZmqClientWrapper
 
-_logger = logging.getLogger("colosseum.messaging")
+_logger = get_logger("colosseum.messaging")
 
 
 def _require_config_item(section: str, item_id: int) -> dict[str, object]:
-    ctx = require_context()
+    ctx = get_context()
     if ctx.config is None:
         raise ConfigError("Configuration is not loaded. Call col.config.load_config(path).")
     return dict(ctx.config.require_item(section, item_id))
 
 
 def get_http_client(http_id: int) -> HttpClientWrapper:
-    ctx = require_context()
+    ctx = get_context()
     key = f"messaging:http:{http_id}"
     cfg = _require_config_item("messaging.http", http_id)
     driver = str(cfg.get("driver", "http")).lower()
@@ -45,7 +45,7 @@ def get_http_client(http_id: int) -> HttpClientWrapper:
 
 
 def get_redis_client(redis_id: int) -> RedisClientWrapper:
-    ctx = require_context()
+    ctx = get_context()
     key = f"messaging:redis:{redis_id}"
     cfg = _require_config_item("messaging.redis", redis_id)
     driver = str(cfg.get("driver", "redis")).lower()
@@ -70,7 +70,7 @@ def get_redis_client(redis_id: int) -> RedisClientWrapper:
 
 
 def get_zmq_client(zmq_id: int) -> ZmqClientWrapper:
-    ctx = require_context()
+    ctx = get_context()
     key = f"messaging:zmq:{zmq_id}"
     cfg = _require_config_item("messaging.zmq", zmq_id)
     driver = str(cfg.get("driver", "zmq")).lower()
@@ -94,7 +94,7 @@ def get_zmq_client(zmq_id: int) -> ZmqClientWrapper:
 
 
 def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
-    ctx = require_context()
+    ctx = get_context()
     key = f"messaging:mqtt:{mqtt_id}"
     cfg = _require_config_item("messaging.mqtt", mqtt_id)
     driver = str(cfg.get("driver", "mqtt")).lower()
@@ -116,8 +116,31 @@ def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
     )
 
 
+def get_ssh_client(ssh_id: int) -> SSHClientWrapper:
+    ctx = get_context()
+    key = f"messaging:ssh:{ssh_id}"
+    cfg = _require_config_item("messaging.ssh", ssh_id)
+    driver = str(cfg.get("driver", "ssh")).lower()
+
+    def _open() -> SSHClientWrapper:
+        return SSHClientWrapper(cfg)
+
+    return cached_resource(
+        ctx.resource_cache,
+        key,
+        _open,
+        on_reuse=lambda: _logger.debug("Reusing cached SSH client messaging.ssh id=%s", ssh_id),
+        on_open=lambda: _logger.debug(
+            "Opening SSH client messaging.ssh id=%s driver=%s host=%s",
+            ssh_id,
+            driver,
+            cfg.get("host"),
+        ),
+    )
+
+
 def close_all() -> None:
-    ctx = require_context()
+    ctx = get_context()
     close_cached_resources(
         ctx.resource_cache,
         (
@@ -126,6 +149,7 @@ def close_all() -> None:
                 "messaging:redis:",
                 "messaging:zmq:",
                 "messaging:mqtt:",
+                "messaging:ssh:",
             ),
         ),
         logger=_logger,
