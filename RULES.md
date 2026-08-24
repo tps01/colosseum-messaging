@@ -70,6 +70,7 @@ Only the following licenses are allowed:
 
 ## Code Quality
 
+- Do not add anything beyond what was asked. No scaffolding, no-ops, exceptions, or stubs outside that scope. If the work needs a new system or a meaningful scope increase, ask first.
 - Do not stub out planned features; that's pointless. This applies to code infrastructure, tests, exceptions, etc.
 - Do not over-use helper functions or lambda functions. While they have a place, sometimes it's more clear to juse do a one-off operation in-line.
 - Avoid magic numbers. Instead define a variable with a semantic meaning, or just place a comment above it.
