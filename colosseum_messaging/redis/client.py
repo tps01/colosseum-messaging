@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from colosseum.logging import get_logger
 
 import redis
 from colosseum_messaging.sim import SIM_MAILBOX, sim_redis_get, sim_redis_set
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.redis")
 
@@ -75,7 +78,7 @@ class RedisClientWrapper:
             raise RuntimeError("Redis client is not connected")
         if self._pubsub is None:
             self._pubsub = self._client.pubsub(  # type: ignore[no-untyped-call]
-                ignore_subscribe_messages=True
+                ignore_subscribe_messages=True,
             )
             self._pubsub.subscribe(channel)  # type: ignore[union-attr]
         pubsub = self._pubsub

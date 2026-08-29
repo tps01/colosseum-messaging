@@ -10,7 +10,7 @@ from colosseum.config import load_config
 
 
 def test_messaging_send_receive_verify(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config_path = (
         Path(__file__).resolve().parents[2]
@@ -42,7 +42,7 @@ def test_messaging_send_receive_verify(
     assert col.messaging.mqtt.verify_payload_match(key="mqtt_msg", pattern=r"^on$").status == "PASS"
 
     out = col.messaging.ssh.measure_stdout(
-        ssh_id=1, command="cat /etc/version", key="uut_version"
+        ssh_id=1, command="cat /etc/version", key="uut_version",
     )
     assert "v1.2.3" in out
 

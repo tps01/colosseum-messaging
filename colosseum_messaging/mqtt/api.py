@@ -51,10 +51,10 @@ def receive(
 
 def _lookup_payload(key: str) -> object | None:
     row = get_context().db.get_measurement(
-        "messaging", "mqtt.receive", key, row_index=0
+        "messaging", "mqtt.receive", key, row_index=0,
     )
     if row is not None and row.value is not None:
-        return cast(object, row.value)
+        return cast("object", row.value)
     return None
 
 
