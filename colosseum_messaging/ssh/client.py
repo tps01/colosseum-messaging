@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import paramiko
 from colosseum.logging import get_logger
@@ -31,7 +31,7 @@ class SSHClientWrapper:
 
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507  # bench DUT SSH
-        connect_kwargs: dict[str, object] = {
+        connect_kwargs: dict[str, Any] = {
             "hostname": str(self._config["host"]),
             "port": int(str(self._config.get("port", 22))),
             "username": str(self._config["username"]),
