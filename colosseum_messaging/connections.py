@@ -3,8 +3,8 @@ from __future__ import annotations
 from colosseum.config.loader import ConfigError
 from colosseum.context import get_context
 from colosseum.logging import get_logger
-from colosseum.resource_cache import cached_resource, close_cached_resources
 
+from colosseum_messaging._cache import cached_resource, close_cached_resources
 from colosseum_messaging.http.client import HttpClientWrapper
 from colosseum_messaging.mqtt.client import MqttClientWrapper
 from colosseum_messaging.redis.client import RedisClientWrapper
@@ -58,7 +58,7 @@ def get_redis_client(redis_id: int) -> RedisClientWrapper:
         key,
         _open,
         on_reuse=lambda: _logger.debug(
-            "Reusing cached Redis client messaging.redis id=%s", redis_id
+            "Reusing cached Redis client messaging.redis id=%s", redis_id,
         ),
         on_open=lambda: _logger.debug(
             "Opening Redis client messaging.redis id=%s driver=%s host=%s",

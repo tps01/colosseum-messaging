@@ -3,12 +3,15 @@ from __future__ import annotations
 import queue
 import time
 import uuid
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 import paho.mqtt.client as mqtt
 from colosseum.logging import get_logger
 
 from colosseum_messaging.sim import SIM_MAILBOX
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.mqtt")
 
@@ -76,14 +79,14 @@ class MqttClientWrapper:
                 item = SIM_MAILBOX.receive(self._mailbox_key, remaining)
                 if item is None:
                     raise TimeoutError(
-                        f"No MQTT message on {subscribe_topic!r} within {timeout}s"
+                        f"No MQTT message on {subscribe_topic!r} within {timeout}s",
                     )
                 msg_topic, payload = item
                 if topic is None or _topic_matches(subscribe_topic, msg_topic):
                     return {"topic": msg_topic, "payload": payload}
                 if remaining <= 0:
                     raise TimeoutError(
-                        f"No MQTT message on {subscribe_topic!r} within {timeout}s"
+                        f"No MQTT message on {subscribe_topic!r} within {timeout}s",
                     )
 
         if self._client is None:
@@ -97,7 +100,7 @@ class MqttClientWrapper:
             msg_topic, payload = self._incoming.get(timeout=timeout)
         except queue.Empty as exc:
             raise TimeoutError(
-                f"No MQTT message on {subscribe_topic!r} within {timeout}s"
+                f"No MQTT message on {subscribe_topic!r} within {timeout}s",
             ) from exc
         return {"topic": msg_topic, "payload": payload}
 

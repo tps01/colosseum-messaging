@@ -30,7 +30,7 @@ def register(registry: PluginRegistry) -> None:
             "http_id",
             required_keys=("base_url",),
             optional_keys=("timeout", "verify_tls", "driver"),
-        )
+        ),
     )
     registry.register_config_section(
         ConfigSectionSpec(
@@ -38,7 +38,7 @@ def register(registry: PluginRegistry) -> None:
             "redis_id",
             required_keys=("host",),
             optional_keys=("port", "db", "username", "password", "timeout", "driver"),
-        )
+        ),
     )
     registry.register_config_section(
         ConfigSectionSpec(
@@ -46,7 +46,7 @@ def register(registry: PluginRegistry) -> None:
             "zmq_id",
             required_keys=("endpoint", "socket"),
             optional_keys=("topic", "mode", "driver"),
-        )
+        ),
     )
     registry.register_config_section(
         ConfigSectionSpec(
@@ -62,7 +62,7 @@ def register(registry: PluginRegistry) -> None:
                 "keepalive",
                 "driver",
             ),
-        )
+        ),
     )
     registry.register_config_section(
         ConfigSectionSpec(
@@ -70,5 +70,5 @@ def register(registry: PluginRegistry) -> None:
             "ssh_id",
             required_keys=("host", "username"),
             optional_keys=("port", "password", "key_filename", "timeout", "driver", "auth"),
-        )
+        ),
     )

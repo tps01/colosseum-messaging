@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
                 "first_party:",
                 *[f"  {p.name}" for p in first_party],
                 "",
-            ]
+            ],
         ),
         encoding="utf-8",
     )
@@ -180,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Windows python.org builds usually include it.",
                 "Linux: bake python3-tk (or a Tk-enabled Python) into the host image.",
                 "",
-            ]
+            ],
         ),
         encoding="utf-8",
     )

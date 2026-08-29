@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from colosseum.logging import get_logger
 
 import zmq
 from colosseum_messaging.sim import SIM_MAILBOX
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.zmq")
 
@@ -16,7 +19,7 @@ class ZmqClientWrapper:
         self._socket_kind = str(config["socket"]).strip().lower()
         if self._socket_kind not in ("pub", "sub"):
             raise ValueError(
-                f"messaging.zmq socket must be 'pub' or 'sub', got {self._socket_kind!r}"
+                f"messaging.zmq socket must be 'pub' or 'sub', got {self._socket_kind!r}",
             )
         self._topic = str(config.get("topic", ""))
         mode = config.get("mode")
@@ -26,14 +29,14 @@ class ZmqClientWrapper:
             self._mode = str(mode).strip().lower()
             if self._mode not in ("bind", "connect"):
                 raise ValueError(
-                    f"messaging.zmq mode must be 'bind' or 'connect', got {self._mode!r}"
+                    f"messaging.zmq mode must be 'bind' or 'connect', got {self._mode!r}",
                 )
         self._sim = str(config.get("driver", "zmq")).lower() == "sim"
         self._context: zmq.Context[zmq.Socket[bytes]] | None = None
         self._socket: zmq.Socket[bytes] | None = None
         if self._sim:
             _logger.debug(
-                "ZMQ client sim mode endpoint=%s socket=%s", self._endpoint, self._socket_kind
+                "ZMQ client sim mode endpoint=%s socket=%s", self._endpoint, self._socket_kind,
             )
             return
         self._context = zmq.Context.instance()

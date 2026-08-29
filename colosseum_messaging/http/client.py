@@ -4,10 +4,13 @@ import json
 import ssl
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 from colosseum.logging import get_logger
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.http")
 
@@ -53,7 +56,7 @@ class HttpClientWrapper:
 
         try:
             with urllib.request.urlopen(  # nosec B310  # bench HTTP to configured base_url
-                request, timeout=req_timeout, context=context
+                request, timeout=req_timeout, context=context,
             ) as response:
                 raw = response.read()
                 status_code = int(response.status)

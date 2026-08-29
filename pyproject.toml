@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colosseum-messaging"
-version = "0.2.4"
+version = "0.2.5"
 description = "Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [
-  "colosseum-core>=0.15,<0.16",
+  "colosseum-core>=0.16,<0.17",
   "redis>=5,<6",
   "pyzmq>=26,<27",
   "paho-mqtt>=2,<3",
@@ -42,11 +42,12 @@ line-length = 100
 src = ["colosseum_messaging"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "ANN", "ARG", "SIM", "RET", "PTH"]
+select = ["A", "BLE", "FBT", "N", "COM", "C4", "ISC", "ICN", "TID", "TCH", "E", "F", "W", "I", "B", "UP", "ANN", "ARG", "SIM", "RET", "PTH"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "ARG"]
 "examples/**" = ["ANN", "ARG"]
+"colosseum_messaging/http/**" = ["A005"]
 
 [tool.mypy]
 python_version = "3.12"

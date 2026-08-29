@@ -47,7 +47,7 @@ def _lookup_payload(key: str, commands: tuple[str, ...]) -> object | None:
     for command_name in commands:
         row = ctx.db.get_measurement("messaging", command_name, key, row_index=0)
         if row is not None and row.value is not None:
-            return cast(object, row.value)
+            return cast("object", row.value)
     return None
 
 
