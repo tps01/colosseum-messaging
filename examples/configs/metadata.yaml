@@ -1,0 +1,12 @@
+##################################
+# Optional run metadata (WATS JSON export).
+# Load with: col.config.load_metadata("examples/configs/metadata.yaml")
+##################################
+
+test_metadata:
+  location: SIM_BENCH
+  process_code: "messaging-smoke"
+  revision: "0.1"
+  test_intent: Development
+  user_name: operator
+  uut: messaging-plugin

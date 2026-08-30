@@ -1,4 +1,4 @@
-"""U-MSG-SSH: SSH sim stdout contract."""
+"""U-MSG-SSH: SSH sim stdout specification."""
 
 from __future__ import annotations
 

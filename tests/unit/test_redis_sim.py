@@ -1,4 +1,4 @@
-"""U-MSG-REDIS: Redis sim KV and pub/sub contract."""
+"""U-MSG-REDIS: Redis sim KV and pub/sub specification."""
 
 from __future__ import annotations
 

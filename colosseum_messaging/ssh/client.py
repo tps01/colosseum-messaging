@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 import paramiko
 from colosseum.logging import get_logger
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.ssh")
 
@@ -28,7 +31,7 @@ class SSHClientWrapper:
 
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507  # bench DUT SSH
-        connect_kwargs: dict[str, object] = {
+        connect_kwargs: dict[str, Any] = {
             "hostname": str(self._config["host"]),
             "port": int(str(self._config.get("port", 22))),
             "username": str(self._config["username"]),
@@ -42,7 +45,7 @@ class SSHClientWrapper:
             connect_kwargs["password"] = str(password)
             connect_kwargs["allow_agent"] = False
             connect_kwargs["look_for_keys"] = False
-        client.connect(**connect_kwargs)  # type: ignore[arg-type]
+        client.connect(**connect_kwargs)
         self._client = client
         _logger.debug(
             "SSH connected to %s:%s as %s",
@@ -79,7 +82,7 @@ class SSHClientWrapper:
             if client is None:
                 raise RuntimeError("SSH client is not connected")
             _stdin, stdout, _stderr = client.exec_command(  # nosec B601  # test script command
-                command, timeout=timeout
+                command, timeout=timeout,
             )
             response = stdout.read().decode("utf-8", errors="replace").strip()
         preview = response[:200] + ("..." if len(response) > 200 else "")

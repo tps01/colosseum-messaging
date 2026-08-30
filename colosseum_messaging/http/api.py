@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from colosseum.context import get_context
 from colosseum.decorators import (
@@ -13,6 +12,9 @@ from colosseum.decorators import (
 )
 
 from colosseum_messaging.connections import get_http_client
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _HTTP_COMMANDS = (
     "http.get",
@@ -175,7 +177,7 @@ def _lookup_http_measurement(key: str) -> object | None:
     for command in _HTTP_COMMANDS:
         row = ctx.db.get_measurement("messaging", command, key, row_index=0)
         if row is not None and row.value is not None:
-            return cast(object, row.value)
+            return cast("object", row.value)
     return None
 
 

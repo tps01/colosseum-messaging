@@ -15,7 +15,7 @@ from colosseum_messaging.connections import get_redis_client
 
 
 @command
-def set(*, redis_id: int, name: str, value: str, key: str = "") -> None:
+def set(*, redis_id: int, name: str, value: str, key: str = "") -> None:  # noqa: A001
     """Set a Redis string key.
 
     :param redis_id: Configured ``messaging.redis`` id from bench TOML.

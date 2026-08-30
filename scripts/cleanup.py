@@ -21,8 +21,11 @@ import contextlib
 import fnmatch
 import os
 import shutil
-from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # Top-level directories under repo root to remove entirely.
 ROOT_DIRS = (
