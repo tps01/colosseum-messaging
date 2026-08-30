@@ -1,4 +1,4 @@
-"""U-MSG-ZMQ: ZMQ sim pub/sub contract."""
+"""U-MSG-ZMQ: ZMQ sim pub/sub specification."""
 
 from __future__ import annotations
 

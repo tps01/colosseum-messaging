@@ -1,4 +1,4 @@
-"""U-MSG-MQTT: MQTT sim publish/receive contract."""
+"""U-MSG-MQTT: MQTT sim publish/receive specification."""
 
 from __future__ import annotations
 

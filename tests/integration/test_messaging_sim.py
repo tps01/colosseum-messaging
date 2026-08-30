@@ -16,7 +16,7 @@ def test_messaging_send_receive_verify(
         Path(__file__).resolve().parents[2]
         / "examples"
         / "configs"
-        / "bench.messaging.sim.toml"
+        / "config.messaging.sim.toml"
     )
     monkeypatch.chdir(tmp_path)
     load_config(config_path)

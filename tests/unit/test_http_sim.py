@@ -1,4 +1,4 @@
-"""U-MSG-HTTP: HTTP sim request contract."""
+"""U-MSG-HTTP: HTTP sim request specification."""
 
 from __future__ import annotations
 

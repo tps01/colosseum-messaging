@@ -68,14 +68,14 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 
-# Local secrets and overrides (bench configs may reference keys/passwords)
+# Local secrets and overrides (config files may reference keys/passwords)
 .env
 .env.*
 !.env.example
 
-# Optional local bench overrides (keep examples/configs/ tracked)
-**/bench.local.toml
-**/bench.*.local.toml
+# Optional local config overrides (keep examples/configs/ tracked)
+**/config.local.toml
+**/config.*.local.toml
 
 # Local notes and agent scratch (normative docs: docs/, examples/)
 scratchpad/

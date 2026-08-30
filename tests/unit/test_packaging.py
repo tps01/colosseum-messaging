@@ -1,4 +1,4 @@
-"""Installed distribution metadata and plugin entry-point contracts."""
+"""Installed distribution metadata and plugin entry-point specifications."""
 
 from importlib.metadata import distribution
 
