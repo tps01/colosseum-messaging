@@ -3,7 +3,7 @@ Example: messaging plugin sim smoke (HTTP, Redis, ZMQ, MQTT, SSH).
 
 Run:
   python examples/test_messaging_sim.py
-  colosseum run examples/test_messaging_sim.py --config examples/configs/bench.messaging.sim.toml
+  colosseum run examples/test_messaging_sim.py --config examples/configs/config.messaging.sim.toml
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import colosseum as col
 _CONFIG = (
     Path(__file__).resolve().parent
     / "configs"
-    / os.environ.get("COLOSSEUM_BENCH_CONFIG", "bench.messaging.sim.toml")
+    / os.environ.get("COLOSSEUM_BENCH_CONFIG", "config.messaging.sim.toml")
 )
 
 
