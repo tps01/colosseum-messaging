@@ -55,4 +55,4 @@ jobs:
           python -m venv .package-venv
           .package-venv/bin/pip install ../colosseum-core
           .package-venv/bin/pip install dist/*.whl
-          .package-venv/bin/python -c "import colosseum_messaging, redis, zmq, paho.mqtt.client, paramiko"
+          .package-venv/bin/python -c "import colosseum_messaging, redis, zmq, paho.mqtt.client, paramiko, scp"

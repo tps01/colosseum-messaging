@@ -42,6 +42,11 @@ def main() -> None:
     col.messaging.mqtt.verify_payload_match(key="mqtt_msg", pattern=r"^on$")
 
     col.messaging.ssh.measure_stdout(ssh_id=1, command="cat /etc/version", key="uut_version")
+    col.messaging.ssh.exec(ssh_id=1, command="echo ok", key="exec_ok")
+    col.messaging.ssh.verify_exit(key="exec_ok", expected=0)
+    col.messaging.ssh.exec_sequence(ssh_id=1, script="echo sequence\n", key="seq")
+    col.messaging.ssh.start(ssh_id=1, command="cat /etc/version", key="bg")
+    col.messaging.ssh.collect(ssh_id=1, key="bg")
 
 
 if __name__ == "__main__":
