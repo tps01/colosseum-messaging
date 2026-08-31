@@ -46,6 +46,22 @@ def test_messaging_send_receive_verify(
     )
     assert "v1.2.3" in out
 
+    result = col.messaging.ssh.exec(ssh_id=1, command="echo ok", key="exec_ok")
+    assert result["stdout"] == "ok"
+    assert col.messaging.ssh.verify_exit(key="exec_ok", expected=0).status == "PASS"
+    assert col.messaging.ssh.verify_stdout_match(key="exec_ok", pattern=r"^ok$").status == "PASS"
+
+    seq = col.messaging.ssh.exec_sequence(
+        ssh_id=1,
+        script="echo /tmp/*\n",
+        key="seq",
+    )
+    assert "/tmp/*" in str(seq["stdout"])
+
+    col.messaging.ssh.start(ssh_id=1, command="cat /etc/version", key="bg")
+    collected = col.messaging.ssh.collect(ssh_id=1, key="bg")
+    assert "v1.2.3" in str(collected["stdout"])
+
     with pytest.raises(SystemExit) as exc_info:
         col.endex()
     assert exc_info.value.code in (None, 0)

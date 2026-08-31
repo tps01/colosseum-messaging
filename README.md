@@ -20,7 +20,7 @@ the project license allowlist. Third-party clients: `redis` (MIT), `pyzmq`
 (BSD-3; bundled
 libzmq is LGPL unmodified), `paho-mqtt` under **EDL-1.0** (BSD-3 equivalent;
 dual-licensed
-EPL-2.0 OR EDL-1.0), and `paramiko` (LGPL unmodified).
+EPL-2.0 OR EDL-1.0), and `paramiko` and `scp` (LGPL unmodified).
 
 ## Usage
 
@@ -33,6 +33,10 @@ col.messaging.http.verify_status(key="health", expected=200)
 col.messaging.redis.set(redis_id=1, name="foo", value="bar")
 col.messaging.redis.get(redis_id=1, name="foo", key="foo")
 col.messaging.ssh.measure_stdout(ssh_id=1, command="uname -a", key="uname")
+col.messaging.ssh.exec(ssh_id=1, command="echo ok", key="exec_ok")
+col.messaging.ssh.verify_exit(key="exec_ok", expected=0)
+col.messaging.ssh.get(ssh_id=1, remote="/etc/network/interfaces", local="interfaces", key="iface")
+col.messaging.scp.get(ssh_id=1, remote="/etc/network/interfaces", local="iface_scp", key="iface_scp")
 col.endex()
 ```
 
