@@ -12,4 +12,4 @@ def path_has_glob(component: str) -> bool:
 def fnmatch_name(name: str, pattern: str, *, case_sensitive: bool) -> bool:
     if case_sensitive:
         return fnmatch.fnmatchcase(name, pattern)
-    return fnmatch.fnmatch(name, pattern)
+    return fnmatch.fnmatchcase(name.lower(), pattern.lower())
