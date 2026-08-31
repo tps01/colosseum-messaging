@@ -7,6 +7,7 @@ import paho.mqtt.client
 import paramiko
 
 import redis
+import scp
 import zmq
 
 
@@ -19,12 +20,14 @@ def test_complete_runtime_dependencies_are_installed_by_default() -> None:
     assert any(requirement.startswith("pyzmq") for requirement in requirements)
     assert any(requirement.startswith("paho-mqtt") for requirement in requirements)
     assert any(requirement.startswith("paramiko") for requirement in requirements)
+    assert any(requirement.startswith("scp") for requirement in requirements)
     extras = set(metadata.metadata.get_all("Provides-Extra") or [])
     assert extras.issubset({"test", "static"})
     assert redis.Redis is not None
     assert zmq.Context is not None
     assert paho.mqtt.client.Client is not None
     assert paramiko.SSHClient is not None
+    assert scp.SCPClient is not None
 
 
 def test_plugin_entry_points_and_version_match_metadata() -> None:

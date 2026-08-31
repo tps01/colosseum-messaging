@@ -69,6 +69,14 @@ def register(registry: PluginRegistry) -> None:
             "messaging.ssh",
             "ssh_id",
             required_keys=("host", "username"),
-            optional_keys=("port", "password", "key_filename", "timeout", "driver", "auth"),
+            optional_keys=(
+                "port",
+                "password",
+                "key_filename",
+                "timeout",
+                "driver",
+                "auth",
+                "platform",
+            ),
         ),
     )

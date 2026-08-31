@@ -22,7 +22,7 @@ Follow the workspace **Minimizing footprint** section (top-level `AGENTS.md`).
 Inventory
 existing code before adding files; prefer merge, relocate, or delete over new
 modules.
-Keep plugin-only helpers local (e.g. `_paths.py`, `_cache.py`)—do not expand
+Keep plugin-only helpers local (e.g. `_paths.py`, `_cache.py`). Do not expand
 core for
 single-plugin needs.
 
