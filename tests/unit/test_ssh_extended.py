@@ -88,3 +88,20 @@ def test_windows_platform_glob_case_insensitive() -> None:
     )
     files = client.resolve_remote_files("C:/logs/*.LOG")
     assert len(files) == 2
+
+
+def test_windows_exec_sequence_requires_interpreter() -> None:
+    from colosseum_messaging.exceptions import MessagingCapabilityError
+
+    client = SSHClientWrapper(
+        {"driver": "sim", "host": "sim.local", "username": "win", "platform": "windows"},
+    )
+    # Sim short-circuits before delivery; exercise the helper directly.
+    with pytest.raises(MessagingCapabilityError, match="requires interpreter="):
+        client._sequence_delivery(suffix="", interpreter=None)  # noqa: SLF001
+
+
+def test_default_platform_is_linux() -> None:
+    client = SSHClientWrapper({"driver": "sim", "host": "sim.local", "username": "pi"})
+    assert client.get_platform() == "linux"
+    assert client.is_sim is True

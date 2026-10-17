@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.zmq")
+_ALLOWED_DRIVERS = frozenset({"sim", "zmq"})
 
 
 class ZmqClientWrapper:
@@ -31,7 +32,12 @@ class ZmqClientWrapper:
                 raise ValueError(
                     f"messaging.zmq mode must be 'bind' or 'connect', got {self._mode!r}",
                 )
-        self._sim = str(config.get("driver", "zmq")).lower() == "sim"
+        driver = str(config.get("driver", "zmq")).lower()
+        if driver not in _ALLOWED_DRIVERS:
+            raise ValueError(
+                f"messaging.zmq driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
+            )
+        self._sim = driver == "sim"
         self._context: zmq.Context[zmq.Socket[bytes]] | None = None
         self._socket: zmq.Socket[bytes] | None = None
         if self._sim:

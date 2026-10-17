@@ -11,6 +11,18 @@ Baseline expectations for AI agents in this plugin repository.
 - User import remains `import colosseum as col`; this package registers
   namespaces via `colosseum.plugins`.
 
+## Layout helpers
+
+- `colosseum_messaging/connections.py`: single `_cached_client` factory for
+  HTTP/Redis/ZMQ/MQTT/SSH. Do not re-duplicate open/cache blocks per transport.
+- `colosseum_messaging/exceptions.py`: `MessagingCapabilityError` for
+  Linux-first SSH refusals (no stub catalogs of unsupported commands).
+- `colosseum_messaging/ssh/_remote_path.py`, `_file_select.py`, `_glob.py`:
+  shared path/glob helpers for SFTP and SCP. Keep drive-letter support; do not
+  invent a second path stack in `scp/`.
+- SCP reuses `messaging.ssh` config via `ssh_id`; do not add a separate SCP
+  config section.
+
 ## Change discipline
 
 Prefer focused, compact changes. Do not commit unless asked. Read `RULES.md` at

@@ -19,6 +19,10 @@ _SSH_EXEC_COMMANDS = (
     "ssh.exec_sequence",
     "ssh.collect",
 )
+_SSH_STDOUT_COMMANDS = (
+    *_SSH_EXEC_COMMANDS,
+    "ssh.measure_stdout",
+)
 
 
 @measurement
@@ -151,9 +155,9 @@ def rename(*, ssh_id: int, old: str, new: str, key: str = "") -> None:
     get_ssh_client(ssh_id).sftp_rename(old, new)
 
 
-def _lookup_ssh_exec(key: str) -> object | None:
+def _lookup_ssh_measurement(key: str, commands: tuple[str, ...]) -> object | None:
     ctx = get_context()
-    for command_name in _SSH_EXEC_COMMANDS:
+    for command_name in commands:
         row = ctx.db.get_measurement("messaging", command_name, key, row_index=0)
         if row is not None and row.value is not None:
             return cast("object", row.value)
@@ -163,7 +167,7 @@ def _lookup_ssh_exec(key: str) -> object | None:
 @verification
 def verify_exit(*, key: str, expected: int = 0, optional: bool = False) -> VerificationResult:
     """Verify a prior SSH exec measurement has the expected exit code."""
-    value = _lookup_ssh_exec(key)
+    value = _lookup_ssh_measurement(key, _SSH_EXEC_COMMANDS)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
     if not isinstance(value, dict) or "exit_code" not in value:
@@ -191,8 +195,8 @@ def verify_stdout_match(
     pattern: str,
     optional: bool = False,
 ) -> VerificationResult:
-    """Verify a prior SSH exec measurement stdout matches a regex."""
-    value = _lookup_ssh_exec(key)
+    """Verify prior SSH stdout (exec dict or ``measure_stdout`` string) matches a regex."""
+    value = _lookup_ssh_measurement(key, _SSH_STDOUT_COMMANDS)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
     stdout = str(value["stdout"]) if isinstance(value, dict) and "stdout" in value else str(value)

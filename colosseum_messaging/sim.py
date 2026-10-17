@@ -30,19 +30,19 @@ class _MailboxStore:
 
 SIM_MAILBOX = _MailboxStore()
 
-# Shared in-memory Redis KV for sim driver (process-local).
+# Shared in-memory Redis KV for sim driver, keyed by mailbox prefix + name.
 _SIM_REDIS_LOCK = threading.Lock()
 _SIM_REDIS_KV: dict[str, str] = {}
 
 
-def sim_redis_set(name: str, value: str) -> None:
+def sim_redis_set(prefix: str, name: str, value: str) -> None:
     with _SIM_REDIS_LOCK:
-        _SIM_REDIS_KV[name] = value
+        _SIM_REDIS_KV[f"{prefix}:{name}"] = value
 
 
-def sim_redis_get(name: str) -> str | None:
+def sim_redis_get(prefix: str, name: str) -> str | None:
     with _SIM_REDIS_LOCK:
-        return _SIM_REDIS_KV.get(name)
+        return _SIM_REDIS_KV.get(f"{prefix}:{name}")
 
 
 def sim_redis_clear() -> None:
