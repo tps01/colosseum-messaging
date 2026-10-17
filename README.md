@@ -2,7 +2,7 @@
 
 ## Documentation
 
-HTML docs (GitHub Pages): https://tps01.github.io/colosseum-messaging/
+API reference (GitHub Pages): https://tps01.github.io/colosseum-messaging/
 
 Framework hub: https://tps01.github.io/colosseum-core/
 
