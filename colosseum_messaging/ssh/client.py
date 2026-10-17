@@ -77,6 +77,31 @@ class SSHClientWrapper:
     def is_sim(self) -> bool:
         return self._sim
 
+    def _load_host_keys(self, client: paramiko.SSHClient) -> None:
+        known_hosts = self._config.get("known_hosts")
+        if known_hosts:
+            client.load_host_keys(str(known_hosts))
+            return
+        client.load_system_host_keys()
+
+    def _apply_host_key_policy(self, client: paramiko.SSHClient) -> None:
+        self._load_host_keys(client)
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+
+    def _require_known_host_key(self, hostname: str, port: int, key: paramiko.PKey) -> None:
+        checker = paramiko.SSHClient()
+        self._apply_host_key_policy(checker)
+        host_id = hostname if port == 22 else f"[{hostname}]:{port}"
+        if checker.get_host_keys().check(host_id, key):
+            return
+        raise paramiko.SSHException(f"SSH host key for {host_id} is not in known_hosts")
+
+    def _require_sim_fs(self) -> SimRemoteFS:
+        sim_fs = self._sim_fs
+        if sim_fs is None:
+            raise RuntimeError("SSH sim filesystem is not initialized")
+        return sim_fs
+
     def _connect_paramiko(self) -> None:
         auth = str(self._config.get("auth", "auto")).strip().lower()
         if auth in ("none", "auth_none"):
@@ -84,7 +109,7 @@ class SSHClientWrapper:
             return
 
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507  # bench DUT SSH
+        self._apply_host_key_policy(client)
         connect_kwargs: dict[str, Any] = {
             "hostname": str(self._config["host"]),
             "port": int(str(self._config.get("port", 22))),
@@ -117,9 +142,15 @@ class SSHClientWrapper:
         transport.banner_timeout = timeout
         transport.auth_timeout = timeout
         transport.start_client(timeout=timeout)
+        try:
+            remote_key = transport.get_remote_server_key()
+            self._require_known_host_key(hostname, port, remote_key)
+        except (OSError, paramiko.SSHException):
+            transport.close()
+            raise
         transport.auth_none(username)
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507  # bench DUT SSH
+        self._apply_host_key_policy(client)
         transport_attr = "_transport"
         setattr(client, transport_attr, transport)
         self._client = client
@@ -381,8 +412,7 @@ class SSHClientWrapper:
         written: list[str] = []
         for remote_path, local_path in mappings:
             if self._sim:
-                assert self._sim_fs is not None
-                self._sim_fs.get_file(remote_path, local_path)
+                self._require_sim_fs().get_file(remote_path, local_path)
             else:
                 self._require_sftp().get(remote_path, str(local_path))
             written.append(str(local_path))
@@ -407,8 +437,7 @@ class SSHClientWrapper:
         written: list[str] = []
         for local_path, remote_path in mappings:
             if self._sim:
-                assert self._sim_fs is not None
-                self._sim_fs.put_file(remote_path, local_path)
+                self._require_sim_fs().put_file(remote_path, local_path)
             else:
                 remote_parent = normalize_remote_path(remote_path).rsplit("/", 1)[0]
                 sftp_client = self._require_sftp()
@@ -428,8 +457,7 @@ class SSHClientWrapper:
     def sftp_mkdir(self, path: str) -> None:
         normalized = normalize_remote_path(path)
         if self._sim:
-            assert self._sim_fs is not None
-            self._sim_fs.mkdir(normalized)
+            self._require_sim_fs().mkdir(normalized)
             return
         sftp = self._require_sftp()
         drive, parts = split_remote_path(normalized)
@@ -446,8 +474,7 @@ class SSHClientWrapper:
     def sftp_remove(self, path: str) -> None:
         normalized = normalize_remote_path(path)
         if self._sim:
-            assert self._sim_fs is not None
-            self._sim_fs.remove(normalized)
+            self._require_sim_fs().remove(normalized)
             return
         self._require_sftp().remove(normalized)
 
@@ -455,8 +482,7 @@ class SSHClientWrapper:
         old_norm = normalize_remote_path(old)
         new_norm = normalize_remote_path(new)
         if self._sim:
-            assert self._sim_fs is not None
-            self._sim_fs.rename(old_norm, new_norm)
+            self._require_sim_fs().rename(old_norm, new_norm)
             return
         self._require_sftp().rename(old_norm, new_norm)
 

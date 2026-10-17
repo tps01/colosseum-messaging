@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import json
 import ssl
-import urllib.error
-import urllib.request
+from http.client import HTTPConnection, HTTPException, HTTPSConnection
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin
+from urllib.parse import SplitResult, urljoin, urlsplit
 
 from colosseum.logging import get_logger
 
@@ -14,6 +13,9 @@ if TYPE_CHECKING:
 
 _logger = get_logger("colosseum.messaging.http")
 _ALLOWED_DRIVERS = frozenset({"sim", "http"})
+_ALLOWED_SCHEMES = frozenset({"http", "https"})
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+_MAX_REDIRECTS = 5
 
 
 class HttpClientWrapper:
@@ -21,6 +23,7 @@ class HttpClientWrapper:
         self._base_url = str(config["base_url"]).rstrip("/") + "/"
         self._timeout = float(str(config.get("timeout", 10.0)))
         self._verify_tls = bool(config.get("verify_tls", True))
+        _require_http_url(self._base_url)
         driver = str(config.get("driver", "http")).lower()
         if driver not in _ALLOWED_DRIVERS:
             raise ValueError(
@@ -55,28 +58,64 @@ class HttpClientWrapper:
         if self._sim:
             return self._sim_request(method_u, path, body=body)
 
-        request = urllib.request.Request(url, data=body, method=method_u, headers=req_headers)
-        context: ssl.SSLContext | None = None
-        if url.lower().startswith("https") and not self._verify_tls:
-            context = ssl._create_unverified_context()  # nosec B323  # bench opt-out
-
+        redirects = 0
         try:
-            with urllib.request.urlopen(  # nosec B310  # bench HTTP to configured base_url
-                request, timeout=req_timeout, context=context,
-            ) as response:
-                raw = response.read()
-                status_code = int(response.status)
-                text = raw.decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as exc:
-            raw = exc.read()
-            status_code = int(exc.code)
-            text = raw.decode("utf-8", errors="replace")
-        except Exception as exc:
+            while True:
+                status_code, text, location = self._exchange(
+                    method_u, url, body, req_headers, req_timeout,
+                )
+                if (
+                    status_code in _REDIRECT_STATUSES
+                    and location
+                    and redirects < _MAX_REDIRECTS
+                ):
+                    redirects += 1
+                    url = urljoin(url, location)
+                    if status_code in {301, 302, 303} and method_u not in {"GET", "HEAD"}:
+                        method_u = "GET"
+                        body = None
+                    continue
+                break
+        except (HTTPException, TimeoutError, OSError, ValueError) as exc:
             raise RuntimeError(f"HTTP {method_u} {url} failed: {exc}") from exc
 
         preview = text[:200] + ("..." if len(text) > 200 else "")
         _logger.debug("HTTP status=%s body=%r", status_code, preview)
         return {"status_code": status_code, "body": text}
+
+    def _exchange(
+        self,
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> tuple[int, str, str | None]:
+        parsed = _require_http_url(url)
+        hostname = parsed.hostname or ""
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        target = parsed.path or "/"
+        if parsed.query:
+            target = f"{target}?{parsed.query}"
+        if parsed.scheme == "https":
+            context = ssl.create_default_context()
+            if not self._verify_tls:
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+            connection: HTTPConnection = HTTPSConnection(
+                hostname, port, timeout=timeout, context=context,
+            )
+        else:
+            connection = HTTPConnection(hostname, port, timeout=timeout)
+        try:
+            connection.request(method, target, body=body, headers=dict(headers))
+            response = connection.getresponse()
+            raw = response.read()
+            status = int(response.status)
+            location = response.getheader("Location")
+        finally:
+            connection.close()
+        return status, raw.decode("utf-8", errors="replace"), location
 
     def _sim_request(self, method: str, path: str, *, body: bytes | None) -> dict[str, object]:
         payload = "" if body is None else body.decode("utf-8", errors="replace")
@@ -87,3 +126,10 @@ class HttpClientWrapper:
 
     def close(self) -> None:
         return
+
+
+def _require_http_url(url: str) -> SplitResult:
+    parsed = urlsplit(url)
+    if parsed.scheme not in _ALLOWED_SCHEMES or not parsed.hostname:
+        raise ValueError(f"messaging.http URL must be http(s), got {url!r}")
+    return parsed
