@@ -3,6 +3,12 @@
 First-party Colosseum plugin providing `col.messaging.*` (HTTP, Redis, ZMQ,
 MQTT, SSH).
 
+## Documentation
+
+HTML docs (GitHub Pages): https://tps01.github.io/colosseum-messaging/
+
+Framework hub: https://tps01.github.io/colosseum-core/
+
 ## Install
 
 ```bash
