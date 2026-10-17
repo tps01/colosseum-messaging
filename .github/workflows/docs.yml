@@ -26,6 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Checkout core dependency
+        uses: actions/checkout@v7
+        with:
+          repository: tps01/colosseum-core
+          ref: develop
+          path: .deps/colosseum-core
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -36,6 +42,7 @@ jobs:
           sudo apt-get install -y pandoc
           python -m pip install -U pip setuptools wheel
           python -m pip install "sphinx>=7.0,<9"
+          python -m pip install -e .deps/colosseum-core
           python -m pip install -e .
       - name: Build Pages HTML
         run: python scripts/build_pages.py
