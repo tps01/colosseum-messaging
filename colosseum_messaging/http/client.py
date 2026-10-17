@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.http")
+_ALLOWED_DRIVERS = frozenset({"sim", "http"})
 
 
 class HttpClientWrapper:
@@ -20,7 +21,12 @@ class HttpClientWrapper:
         self._base_url = str(config["base_url"]).rstrip("/") + "/"
         self._timeout = float(str(config.get("timeout", 10.0)))
         self._verify_tls = bool(config.get("verify_tls", True))
-        self._sim = str(config.get("driver", "http")).lower() == "sim"
+        driver = str(config.get("driver", "http")).lower()
+        if driver not in _ALLOWED_DRIVERS:
+            raise ValueError(
+                f"messaging.http driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
+            )
+        self._sim = driver == "sim"
         if self._sim:
             _logger.debug("HTTP client sim mode enabled base_url=%s", self._base_url)
 

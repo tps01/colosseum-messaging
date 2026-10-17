@@ -21,11 +21,10 @@ class BackgroundJob:
     command: str
     stdout_path: Path
     stderr_path: Path
-    thread: threading.Thread
+    thread: threading.Thread | None
     channel: Any | None
     done: threading.Event = field(default_factory=threading.Event)
     exit_code: int | None = None
-    lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 def start_background_reader(

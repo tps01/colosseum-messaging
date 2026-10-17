@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import colosseum as col
+import colosseum.context as context_module
 import pytest
 from colosseum.config import load_config
 
@@ -19,6 +20,9 @@ def test_messaging_send_receive_verify(
         / "config.messaging.sim.toml"
     )
     monkeypatch.chdir(tmp_path)
+    ctx = context_module.init_context(test_case_name="messaging_sim")
+    ctx.output_dir = tmp_path
+    ctx.db.initialize(tmp_path / "execution.sqlite")
     load_config(config_path)
 
     col.messaging.http.get(http_id=1, path="/health", key="health")
@@ -45,11 +49,23 @@ def test_messaging_send_receive_verify(
         ssh_id=1, command="cat /etc/version", key="uut_version",
     )
     assert "v1.2.3" in out
+    assert col.messaging.ssh.verify_stdout_match(
+        key="uut_version", pattern=r"v1\.2\.3",
+    ).status == "PASS"
 
     result = col.messaging.ssh.exec(ssh_id=1, command="echo ok", key="exec_ok")
     assert result["stdout"] == "ok"
     assert col.messaging.ssh.verify_exit(key="exec_ok", expected=0).status == "PASS"
     assert col.messaging.ssh.verify_stdout_match(key="exec_ok", pattern=r"^ok$").status == "PASS"
+
+    written = col.messaging.ssh.get(
+        ssh_id=1, remote="/etc/network/interfaces", local="interfaces", key="iface",
+    )
+    assert written
+    scp_written = col.messaging.scp.get(
+        ssh_id=1, remote="/etc/network/interfaces", local="iface_scp", key="iface_scp",
+    )
+    assert scp_written
 
     seq = col.messaging.ssh.exec_sequence(
         ssh_id=1,
