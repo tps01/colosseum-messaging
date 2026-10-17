@@ -77,6 +77,7 @@ def register(registry: PluginRegistry) -> None:
                 "driver",
                 "auth",
                 "platform",
+                "known_hosts",
             ),
         ),
     )
