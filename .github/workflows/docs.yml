@@ -1,0 +1,52 @@
+name: Documentation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "scripts/build_pages.py"
+      - ".github/workflows/docs.yml"
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install pandoc and Sphinx
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          python -m pip install -U pip setuptools wheel
+          python -m pip install "sphinx>=7.0,<9"
+      - name: Build Pages HTML
+        run: python scripts/build_pages.py
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/pages/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
