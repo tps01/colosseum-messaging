@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, TypeVar
+
 from colosseum.config.loader import ConfigError
 from colosseum.context import get_context
 from colosseum.logging import get_logger
@@ -11,7 +13,12 @@ from colosseum_messaging.redis.client import RedisClientWrapper
 from colosseum_messaging.ssh.client import SSHClientWrapper
 from colosseum_messaging.zmq.client import ZmqClientWrapper
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 _logger = get_logger("colosseum.messaging")
+
+T = TypeVar("T")
 
 
 def _require_config_item(section: str, item_id: int) -> dict[str, object]:
@@ -21,121 +28,92 @@ def _require_config_item(section: str, item_id: int) -> dict[str, object]:
     return dict(ctx.config.require_item(section, item_id))
 
 
-def get_http_client(http_id: int) -> HttpClientWrapper:
+def _cached_client(
+    *,
+    section: str,
+    item_id: int,
+    cache_prefix: str,
+    wrapper_cls: Callable[[dict[str, object]], T],
+    default_driver: str,
+    detail: Callable[[dict[str, object]], str],
+) -> T:
     ctx = get_context()
-    key = f"messaging:http:{http_id}"
-    cfg = _require_config_item("messaging.http", http_id)
-    driver = str(cfg.get("driver", "http")).lower()
+    key = f"{cache_prefix}:{item_id}"
+    cfg = _require_config_item(section, item_id)
+    driver = str(cfg.get("driver", default_driver)).lower()
 
-    def _open() -> HttpClientWrapper:
-        return HttpClientWrapper(cfg)
+    def _open() -> T:
+        return wrapper_cls(cfg)
 
     return cached_resource(
         ctx.resource_cache,
         key,
         _open,
-        on_reuse=lambda: _logger.debug("Reusing cached HTTP client messaging.http id=%s", http_id),
+        on_reuse=lambda: _logger.debug("Reusing cached %s id=%s", section, item_id),
         on_open=lambda: _logger.debug(
-            "Opening HTTP client messaging.http id=%s driver=%s base_url=%s",
-            http_id,
+            "Opening %s id=%s driver=%s %s",
+            section,
+            item_id,
             driver,
-            cfg.get("base_url"),
+            detail(cfg),
         ),
+    )
+
+
+def get_http_client(http_id: int) -> HttpClientWrapper:
+    return _cached_client(
+        section="messaging.http",
+        item_id=http_id,
+        cache_prefix="messaging:http",
+        wrapper_cls=HttpClientWrapper,
+        default_driver="http",
+        detail=lambda cfg: f"base_url={cfg.get('base_url')}",
     )
 
 
 def get_redis_client(redis_id: int) -> RedisClientWrapper:
-    ctx = get_context()
-    key = f"messaging:redis:{redis_id}"
-    cfg = _require_config_item("messaging.redis", redis_id)
-    driver = str(cfg.get("driver", "redis")).lower()
-
-    def _open() -> RedisClientWrapper:
-        return RedisClientWrapper(cfg)
-
-    return cached_resource(
-        ctx.resource_cache,
-        key,
-        _open,
-        on_reuse=lambda: _logger.debug(
-            "Reusing cached Redis client messaging.redis id=%s", redis_id,
-        ),
-        on_open=lambda: _logger.debug(
-            "Opening Redis client messaging.redis id=%s driver=%s host=%s",
-            redis_id,
-            driver,
-            cfg.get("host"),
-        ),
+    return _cached_client(
+        section="messaging.redis",
+        item_id=redis_id,
+        cache_prefix="messaging:redis",
+        wrapper_cls=RedisClientWrapper,
+        default_driver="redis",
+        detail=lambda cfg: f"host={cfg.get('host')}",
     )
 
 
 def get_zmq_client(zmq_id: int) -> ZmqClientWrapper:
-    ctx = get_context()
-    key = f"messaging:zmq:{zmq_id}"
-    cfg = _require_config_item("messaging.zmq", zmq_id)
-    driver = str(cfg.get("driver", "zmq")).lower()
-
-    def _open() -> ZmqClientWrapper:
-        return ZmqClientWrapper(cfg)
-
-    return cached_resource(
-        ctx.resource_cache,
-        key,
-        _open,
-        on_reuse=lambda: _logger.debug("Reusing cached ZMQ client messaging.zmq id=%s", zmq_id),
-        on_open=lambda: _logger.debug(
-            "Opening ZMQ client messaging.zmq id=%s driver=%s endpoint=%s socket=%s",
-            zmq_id,
-            driver,
-            cfg.get("endpoint"),
-            cfg.get("socket"),
+    return _cached_client(
+        section="messaging.zmq",
+        item_id=zmq_id,
+        cache_prefix="messaging:zmq",
+        wrapper_cls=ZmqClientWrapper,
+        default_driver="zmq",
+        detail=lambda cfg: (
+            f"endpoint={cfg.get('endpoint')} socket={cfg.get('socket')}"
         ),
     )
 
 
 def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
-    ctx = get_context()
-    key = f"messaging:mqtt:{mqtt_id}"
-    cfg = _require_config_item("messaging.mqtt", mqtt_id)
-    driver = str(cfg.get("driver", "mqtt")).lower()
-
-    def _open() -> MqttClientWrapper:
-        return MqttClientWrapper(cfg)
-
-    return cached_resource(
-        ctx.resource_cache,
-        key,
-        _open,
-        on_reuse=lambda: _logger.debug("Reusing cached MQTT client messaging.mqtt id=%s", mqtt_id),
-        on_open=lambda: _logger.debug(
-            "Opening MQTT client messaging.mqtt id=%s driver=%s host=%s",
-            mqtt_id,
-            driver,
-            cfg.get("host"),
-        ),
+    return _cached_client(
+        section="messaging.mqtt",
+        item_id=mqtt_id,
+        cache_prefix="messaging:mqtt",
+        wrapper_cls=MqttClientWrapper,
+        default_driver="mqtt",
+        detail=lambda cfg: f"host={cfg.get('host')}",
     )
 
 
 def get_ssh_client(ssh_id: int) -> SSHClientWrapper:
-    ctx = get_context()
-    key = f"messaging:ssh:{ssh_id}"
-    cfg = _require_config_item("messaging.ssh", ssh_id)
-    driver = str(cfg.get("driver", "ssh")).lower()
-
-    def _open() -> SSHClientWrapper:
-        return SSHClientWrapper(cfg)
-
-    return cached_resource(
-        ctx.resource_cache,
-        key,
-        _open,
-        on_reuse=lambda: _logger.debug("Reusing cached SSH client messaging.ssh id=%s", ssh_id),
-        on_open=lambda: _logger.debug(
-            "Opening SSH client messaging.ssh id=%s driver=%s host=%s",
-            ssh_id,
-            driver,
-            cfg.get("host"),
-        ),
+    return _cached_client(
+        section="messaging.ssh",
+        item_id=ssh_id,
+        cache_prefix="messaging:ssh",
+        wrapper_cls=SSHClientWrapper,
+        default_driver="ssh",
+        detail=lambda cfg: f"host={cfg.get('host')}",
     )
 
 

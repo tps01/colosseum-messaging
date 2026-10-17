@@ -27,7 +27,7 @@ class ScpClientWrapper:
         newest: int | None = None,
         oldest: int | None = None,
     ) -> list[str]:
-        if self._ssh._sim:  # noqa: SLF001
+        if self._ssh.is_sim:
             return self._ssh.sftp_get(
                 remote,
                 local,
@@ -66,7 +66,7 @@ class ScpClientWrapper:
         recursive: bool = False,
         max_depth: int | None = None,
     ) -> list[str]:
-        if self._ssh._sim:  # noqa: SLF001
+        if self._ssh.is_sim:
             return self._ssh.sftp_put(local, remote, recursive=recursive, max_depth=max_depth)
 
         from colosseum_messaging.ssh._file_select import map_local_put_paths, select_local_files

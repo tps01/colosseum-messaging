@@ -1,7 +1,7 @@
 # Colosseum Messaging
 
 First-party Colosseum plugin providing `col.messaging.*` (HTTP, Redis, ZMQ,
-MQTT, SSH).
+MQTT, SSH, SCP).
 
 ## Install
 
@@ -9,18 +9,23 @@ MQTT, SSH).
 pip install colosseum-messaging
 ```
 
-This installs the complete plugin (HTTP via stdlib, Redis, ZMQ, MQTT, and SSH).
-It requires
-`colosseum-core` 0.16.1+ and registers the `messaging` namespace through the
-`colosseum.plugins` entry point.
+This installs the complete plugin (HTTP via stdlib, Redis, ZMQ, MQTT, SSH, and
+SCP). It requires `colosseum-core` 0.16.4+ and registers the `messaging`
+namespace through the `colosseum.plugins` entry point.
 
 HTTP uses the Python standard library (`urllib.request`) so the default install
-stays on
-the project license allowlist. Third-party clients: `redis` (MIT), `pyzmq`
-(BSD-3; bundled
-libzmq is LGPL unmodified), `paho-mqtt` under **EDL-1.0** (BSD-3 equivalent;
-dual-licensed
-EPL-2.0 OR EDL-1.0), and `paramiko` and `scp` (LGPL unmodified).
+stays on the project license allowlist. Third-party clients: `redis` (MIT),
+`pyzmq` (BSD-3; bundled libzmq is LGPL unmodified), `paho-mqtt` under
+**EDL-1.0** (BSD-3 equivalent; dual-licensed EPL-2.0 OR EDL-1.0), and
+`paramiko` and `scp` (LGPL unmodified).
+
+## SSH platform
+
+SSH is Linux-first. Path/glob helpers still accept Windows-style remote paths
+when `platform = "windows"` is set in `[messaging.ssh]`. Shell defaults for
+`exec_sequence` without `interpreter=` assume a POSIX host; on Windows, pass
+`interpreter=` or use an explicit `.bat`/`.cmd`/`.ps1` script. Unsupported
+defaults raise `colosseum_messaging.exceptions.MessagingCapabilityError`.
 
 ## Usage
 
@@ -33,6 +38,7 @@ col.messaging.http.verify_status(key="health", expected=200)
 col.messaging.redis.set(redis_id=1, name="foo", value="bar")
 col.messaging.redis.get(redis_id=1, name="foo", key="foo")
 col.messaging.ssh.measure_stdout(ssh_id=1, command="uname -a", key="uname")
+col.messaging.ssh.verify_stdout_match(key="uname", pattern=r"Linux")
 col.messaging.ssh.exec(ssh_id=1, command="echo ok", key="exec_ok")
 col.messaging.ssh.verify_exit(key="exec_ok", expected=0)
 col.messaging.ssh.get(ssh_id=1, remote="/etc/network/interfaces", local="interfaces", key="iface")

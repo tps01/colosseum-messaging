@@ -10,6 +10,7 @@ import paramiko
 from colosseum.logging import get_logger
 
 from colosseum_messaging._paths import resolve_artifact_path
+from colosseum_messaging.exceptions import MessagingCapabilityError
 from colosseum_messaging.ssh._background import (
     BackgroundJob,
     drain_channel,
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
 _logger = get_logger("colosseum.messaging.ssh")
 
 ExecResult = dict[str, object]
+_ALLOWED_DRIVERS = frozenset({"sim", "ssh"})
+_ALLOWED_AUTH = frozenset({"", "auto", "none", "auth_none"})
+_ALLOWED_PLATFORMS = frozenset({"", "linux", "windows"})
 
 
 class SSHClientWrapper:
@@ -38,21 +42,40 @@ class SSHClientWrapper:
         self._client: paramiko.SSHClient | None = None
         self._sftp: paramiko.SFTPClient | None = None
         self._sim_fs: SimRemoteFS | None = None
-        self._platform: str | None = None
         self._jobs: dict[str, BackgroundJob] = {}
         self._jobs_lock = threading.Lock()
+
         driver = str(config.get("driver", "ssh")).lower()
+        if driver not in _ALLOWED_DRIVERS:
+            raise ValueError(
+                f"messaging.ssh driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
+            )
+        auth = str(config.get("auth", "auto")).strip().lower()
+        if auth not in _ALLOWED_AUTH:
+            raise ValueError(
+                f"messaging.ssh auth must be one of "
+                f"{sorted(a for a in _ALLOWED_AUTH if a)}, got {auth!r}",
+            )
+        configured = str(config.get("platform", "")).strip().lower()
+        if configured not in _ALLOWED_PLATFORMS:
+            raise ValueError(
+                f"messaging.ssh platform must be 'linux' or 'windows', got {configured!r}",
+            )
+        self._platform = "linux" if configured == "" else configured
+
         if driver == "sim":
             self._sim = True
             self._sim_fs = SimRemoteFS()
             seed_sim_fs(self._sim_fs, self._config)
-            configured = str(config.get("platform", "")).strip().lower()
-            self._platform = configured if configured in ("linux", "windows") else "linux"
             _logger.debug("SSH client sim mode enabled platform=%s", self._platform)
         else:
             self._sim = False
             self._sim_fs = None
             self._connect_paramiko()
+
+    @property
+    def is_sim(self) -> bool:
+        return self._sim
 
     def _connect_paramiko(self) -> None:
         auth = str(self._config.get("auth", "auto")).strip().lower()
@@ -103,18 +126,6 @@ class SSHClientWrapper:
         _logger.debug("SSH connected to %s:%s as %s (auth=none)", hostname, port, username)
 
     def get_platform(self) -> str:
-        if self._platform is not None:
-            return self._platform
-        configured = str(self._config.get("platform", "")).strip().lower()
-        if configured in ("linux", "windows"):
-            self._platform = configured
-            return self._platform
-        if self._sim:
-            self._platform = "linux"
-            return self._platform
-        result = self.exec("uname -s", timeout=5.0)
-        stdout = str(result.get("stdout", ""))
-        self._platform = "linux" if stdout.strip() else "windows"
         return self._platform
 
     def _case_sensitive_glob(self) -> bool:
@@ -139,7 +150,6 @@ class SSHClientWrapper:
         timeout: float = 30.0,
         input_data: bytes | str | None = None,
         get_pty: bool = False,
-        environment: Mapping[str, str] | None = None,
     ) -> ExecResult:
         _logger.debug("SSH exec: %s (timeout=%ss)", command, timeout)
         if self._sim:
@@ -150,7 +160,6 @@ class SSHClientWrapper:
             command,
             timeout=timeout,
             get_pty=get_pty,
-            environment=dict(environment) if environment is not None else None,
         )
         if input_data is not None:
             payload = input_data.encode("utf-8") if isinstance(input_data, str) else input_data
@@ -233,15 +242,20 @@ class SSHClientWrapper:
                 "mode": "upload",
                 "command": "powershell -NoProfile -NonInteractive -File {remote}",
             }
-        if suffix in (".sh", ".bash", ""):
-            if platform == "windows" and suffix == "":
-                return {
-                    "mode": "stdin",
-                    "command": "powershell -NoProfile -NonInteractive -Command -",
-                }
+        if suffix in (".sh", ".bash"):
+            return {"mode": "stdin", "command": "bash -s"}
+        if suffix == "":
+            if platform == "windows":
+                raise MessagingCapabilityError(
+                    "exec_sequence on Windows requires interpreter= "
+                    "(Linux-first SSH; see README)",
+                )
             return {"mode": "stdin", "command": "bash -s"}
         if platform == "windows":
-            return {"mode": "upload", "command": "cmd /c {remote}"}
+            raise MessagingCapabilityError(
+                f"exec_sequence suffix {suffix!r} on Windows requires interpreter= "
+                "(Linux-first SSH; see README)",
+            )
         return {"mode": "stdin", "command": "bash -s"}
 
     def start(
@@ -263,7 +277,7 @@ class SSHClientWrapper:
                 command=command,
                 stdout_path=stdout_path,
                 stderr_path=stderr_path,
-                thread=threading.Thread(),
+                thread=None,
                 channel=None,
             )
             job.exit_code = 0
@@ -474,7 +488,8 @@ class SSHClientWrapper:
             if not job.done.is_set():
                 if job.channel is not None:
                     job.channel.close()
-                job.thread.join(timeout=1.0)
+                if job.thread is not None:
+                    job.thread.join(timeout=1.0)
                 job.done.set()
         if self._sftp is not None:
             self._sftp.close()

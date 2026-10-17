@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.mqtt")
+_ALLOWED_DRIVERS = frozenset({"sim", "mqtt"})
 
 
 class MqttClientWrapper:
@@ -21,11 +22,16 @@ class MqttClientWrapper:
         self._host = str(config["host"])
         self._port = int(str(config.get("port", 1883)))
         self._topic = str(config.get("topic", "#"))
-        self._sim = str(config.get("driver", "mqtt")).lower() == "sim"
+        driver = str(config.get("driver", "mqtt")).lower()
+        if driver not in _ALLOWED_DRIVERS:
+            raise ValueError(
+                f"messaging.mqtt driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
+            )
+        self._sim = driver == "sim"
         self._mailbox_key = f"mqtt:{self._host}:{self._port}"
         self._client: mqtt.Client | None = None
         self._incoming: queue.Queue[tuple[str, str]] = queue.Queue()
-        self._subscribed = False
+        self._subscribed_topic: str | None = None
         if self._sim:
             _logger.debug("MQTT client sim mode host=%s", self._host)
             return
@@ -91,18 +97,29 @@ class MqttClientWrapper:
 
         if self._client is None:
             raise RuntimeError("MQTT client is not connected")
-        if not self._subscribed:
+        if self._subscribed_topic != subscribe_topic:
+            if self._subscribed_topic is not None:
+                self._client.unsubscribe(self._subscribed_topic)
             result, _mid = self._client.subscribe(subscribe_topic)
             if result != mqtt.MQTT_ERR_SUCCESS:
                 raise RuntimeError(f"MQTT subscribe failed with rc={result}")
-            self._subscribed = True
-        try:
-            msg_topic, payload = self._incoming.get(timeout=timeout)
-        except queue.Empty as exc:
-            raise TimeoutError(
-                f"No MQTT message on {subscribe_topic!r} within {timeout}s",
-            ) from exc
-        return {"topic": msg_topic, "payload": payload}
+            self._subscribed_topic = subscribe_topic
+
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"No MQTT message on {subscribe_topic!r} within {timeout}s",
+                )
+            try:
+                msg_topic, payload = self._incoming.get(timeout=remaining)
+            except queue.Empty as exc:
+                raise TimeoutError(
+                    f"No MQTT message on {subscribe_topic!r} within {timeout}s",
+                ) from exc
+            if _topic_matches(subscribe_topic, msg_topic):
+                return {"topic": msg_topic, "payload": payload}
 
     def close(self) -> None:
         if self._client is not None:
@@ -112,6 +129,7 @@ class MqttClientWrapper:
             except Exception:
                 _logger.exception("Failed to close MQTT client")
             self._client = None
+            self._subscribed_topic = None
 
 
 def _topic_matches(filter_topic: str, message_topic: str) -> bool:

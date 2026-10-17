@@ -11,13 +11,20 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.redis")
+_ALLOWED_DRIVERS = frozenset({"sim", "redis"})
 
 
 class RedisClientWrapper:
     def __init__(self, config: Mapping[str, object]) -> None:
-        self._sim = str(config.get("driver", "redis")).lower() == "sim"
+        driver = str(config.get("driver", "redis")).lower()
+        if driver not in _ALLOWED_DRIVERS:
+            raise ValueError(
+                f"messaging.redis driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
+            )
+        self._sim = driver == "sim"
         self._client: redis.Redis | None = None
         self._pubsub: object | None = None
+        self._subscribed_channel: str | None = None
         self._mailbox_prefix = f"redis:{config.get('host')}:{config.get('port', 6379)}"
         if self._sim:
             _logger.debug("Redis client sim mode enabled")
@@ -40,7 +47,7 @@ class RedisClientWrapper:
     def set(self, name: str, value: str) -> None:
         _logger.debug("Redis SET %s", name)
         if self._sim:
-            sim_redis_set(name, value)
+            sim_redis_set(self._mailbox_prefix, name, value)
             return
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
@@ -49,7 +56,7 @@ class RedisClientWrapper:
     def get(self, name: str) -> str | None:
         _logger.debug("Redis GET %s", name)
         if self._sim:
-            return sim_redis_get(name)
+            return sim_redis_get(self._mailbox_prefix, name)
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
         value = self._client.get(name)
@@ -76,11 +83,20 @@ class RedisClientWrapper:
             return {"topic": topic, "payload": payload}
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
-        if self._pubsub is None:
+        if self._pubsub is None or self._subscribed_channel != channel:
+            if self._pubsub is not None:
+                try:
+                    close = getattr(self._pubsub, "close", None)
+                    if callable(close):
+                        close()
+                except Exception:
+                    _logger.exception("Failed to close Redis pubsub before resubscribe")
+                self._pubsub = None
             self._pubsub = self._client.pubsub(  # type: ignore[no-untyped-call]
                 ignore_subscribe_messages=True,
             )
             self._pubsub.subscribe(channel)  # type: ignore[union-attr]
+            self._subscribed_channel = channel
         pubsub = self._pubsub
         message = pubsub.get_message(timeout=timeout)  # type: ignore[union-attr]
         if message is None or message.get("type") != "message":
@@ -107,6 +123,7 @@ class RedisClientWrapper:
             except Exception:
                 _logger.exception("Failed to close Redis pubsub")
             self._pubsub = None
+            self._subscribed_channel = None
         if self._client is not None:
             try:
                 self._client.close()
