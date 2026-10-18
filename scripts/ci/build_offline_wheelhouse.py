@@ -120,7 +120,6 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
             ],
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
     (wheelhouse / "install.sh").write_text(
@@ -146,7 +145,6 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
             ],
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
     (wheelhouse / "start_cli.bat").write_text(
@@ -165,7 +163,6 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
             ],
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
     (wheelhouse / "start_cli.sh").write_text(
@@ -186,7 +183,6 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
             ],
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
     (wheelhouse / "start_gui.bat").write_text(
@@ -204,7 +200,6 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
             ],
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
     (wheelhouse / "start_gui.sh").write_text(
@@ -224,7 +219,6 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
             ],
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
     # Best-effort executable bit for Unix hosts that extract the archive.
