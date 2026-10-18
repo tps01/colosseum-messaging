@@ -11,15 +11,19 @@ MQTT, SSH, SCP).
 
 ## Install
 
+Download the wheel from [GitHub Releases](https://github.com/tps01/colosseum-messaging/releases)
+and install it in the same environment as core. Replace `<version>` with
+the downloaded filename. For development, use `python -m pip install -e .`.
+
 ```bash
-pip install colosseum-messaging
+python -m pip install "./colosseum_messaging-<version>-py3-none-any.whl"
 ```
 
 This installs the complete plugin (HTTP via stdlib, Redis, ZMQ, MQTT, SSH, and
-SCP). It requires `colosseum-core` 0.16.4+ and registers the `messaging`
+SCP). It requires `colosseum-core` `>=0.17.0,<0.18` and registers the `messaging`
 namespace through the `colosseum.plugins` entry point.
 
-HTTP uses the Python standard library (`urllib.request`) so the default install
+HTTP uses the Python standard library (`http.client`) so the default install
 stays on the project license allowlist. Third-party clients: `redis` (MIT),
 `pyzmq` (BSD-3; bundled libzmq is LGPL unmodified), `paho-mqtt` under
 **EDL-1.0** (BSD-3 equivalent; dual-licensed EPL-2.0 OR EDL-1.0), and
@@ -55,9 +59,11 @@ col.endex()
 ## Expected artifacts
 
 Normal CLI runs write `summary.json`, `summary.txt`, `execution.sqlite`, and
-`debug.log` under the run output directory. When metadata is loaded (see
-`examples/configs/metadata.yaml`), core also emits a WATS-format
-`wats_<datetime>_<script>.json` report alongside those files.
+`debug.log` under the run output directory. Reports are opt-in: add
+`--report wats` to the run command to write `wats_<datetime>_<script>.json`,
+or `--report junit` for `junit.xml`. Loading `metadata.yaml` enriches an
+enabled report; it does not enable reporting. See the
+[core reporting guide](https://tps01.github.io/colosseum-core/guides/output_artifacts.html).
 
 ## Develop
 

@@ -56,17 +56,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Build offline wheelhouse zip
+      - name: Build offline wheelhouse archive
         working-directory: colosseum-messaging
         run: >
           python scripts/ci/build_offline_wheelhouse.py
           --also-build ../colosseum-core
-          --zip
+          --archive
       - name: Upload offline wheelhouse
         uses: actions/upload-artifact@v7
         with:
           name: offline-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: colosseum-messaging/colosseum-messaging-offline-*.zip
+          path: |
+            colosseum-messaging/colosseum-messaging-offline-*.zip
+            colosseum-messaging/colosseum-messaging-offline-*.tar.gz
           if-no-files-found: error
 
   publish:
@@ -98,22 +100,25 @@ jobs:
           name: Colosseum Messaging ${{ github.ref_name }}
           generate_release_notes: true
           body: |
-            ## Install (online)
+            ## Install from release assets
+
+            Download the wheel below and replace `<version>` with its version.
 
             ```bash
-            pip install colosseum-messaging
+            python -m pip install "./colosseum_messaging-<version>-py3-none-any.whl"
             ```
 
             ## Offline wheelhouses
 
-            Zips include `colosseum-core` plus third-party deps:
+            Archives include `colosseum-core` plus third-party deps. Wheels are under
+            `wheels/`; use the operator scripts at the archive root.
 
-            - `colosseum-messaging-offline-linux-py{3.9,3.12}.zip`
-            - `colosseum-messaging-offline-windows-py{3.9,3.12}.zip`
+            - Windows: `colosseum-messaging-offline-windows-py{3.9,3.12}.zip` → `install.bat`, then `start_cli.bat` / `start_gui.bat`
+            - Linux: `colosseum-messaging-offline-linux-py{3.9,3.12}.tar.gz` → `./install.sh`, then `./start_cli.sh` / `./start_gui.sh`
 
             ```bash
-            unzip colosseum-messaging-offline-<os>-py<ver>.zip -d wheelhouse
-            python -m pip install --no-index --find-links=wheelhouse colosseum-messaging
+            tar -xzf colosseum-messaging-offline-linux-py<ver>.tar.gz -C wheelhouse
+            cd wheelhouse && chmod +x install.sh start_*.sh && ./install.sh
             ```
           files: release-files/*
           fail_on_unmatched_files: true
