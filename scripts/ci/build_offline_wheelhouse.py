@@ -28,6 +28,7 @@ Examples::
 from __future__ import annotations
 
 import argparse
+import contextlib
 import platform
 import re
 import shutil
@@ -229,10 +230,8 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
     # Best-effort executable bit for Unix hosts that extract the archive.
     for name in ("install.sh", "start_cli.sh", "start_gui.sh"):
         path = wheelhouse / name
-        try:
+        with contextlib.suppress(OSError):
             path.chmod(path.stat().st_mode | 0o111)
-        except OSError:
-            pass
 
 
 def main(argv: list[str] | None = None) -> int:
