@@ -26,6 +26,12 @@ def main() -> None:
     col.messaging.http.get(http_id=1, path="/health", key="health")
     col.messaging.http.verify_status(key="health", expected=200)
     col.messaging.http.verify_body_match(key="health", pattern=r"GET /health")
+    col.messaging.http.post(
+        http_id=1, path="/settings", json={"mode": "test"},
+        headers={"X-Run": "example"}, timeout=2.0, key="settings",
+    )
+    col.messaging.http.verify_status(key="settings", expected=200)
+    col.messaging.http.verify_body_match(key="settings", pattern=r"POST /settings")
 
     col.messaging.redis.set(redis_id=1, name="foo", value="bar")
     col.messaging.redis.get(redis_id=1, name="foo", key="foo")
@@ -47,6 +53,13 @@ def main() -> None:
     col.messaging.ssh.exec_sequence(ssh_id=1, script="echo sequence\n", key="seq")
     col.messaging.ssh.start(ssh_id=1, command="cat /etc/version", key="bg")
     col.messaging.ssh.collect(ssh_id=1, key="bg")
+    col.messaging.ssh.verify_exit(key="bg", expected=0)
+    col.messaging.ssh.get(
+        ssh_id=1, remote="/etc/network/interfaces", local="sftp/interfaces", key="sftp_file",
+    )
+    col.messaging.scp.get(
+        ssh_id=1, remote="/etc/network/interfaces", local="scp/interfaces", key="scp_file",
+    )
 
 
 if __name__ == "__main__":

@@ -154,7 +154,7 @@ def _collect_paths(
         if path.exists():
             targets.append(path)
 
-    for pattern in ("*-offline-*.zip", "colosseum-*-offline-*.tar.gz"):
+    for pattern in ("*-offline-*.zip", "*-offline-*.tar.gz"):
         targets.extend(path for path in root.glob(pattern) if path.is_file())
 
     if keep_venvs:

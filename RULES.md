@@ -54,7 +54,7 @@ Only the following licenses are allowed:
 
 ## Messaging dependency notes
 
-- HTTP uses stdlib `urllib.request` (no `httpx`/`requests`/`certifi`).
+- HTTP uses stdlib `http.client` (no `httpx`/`requests`/`certifi`).
 - `paho-mqtt` is dual-licensed EPL-2.0 OR EDL-1.0; this project consumes it
   under **EDL-1.0** (BSD-3 equivalent).
 - `pyzmq` wheels bundle unmodified libzmq (LGPL).
