@@ -199,12 +199,16 @@ def _write_index(api_docs: list[str], guide_names: list[str]) -> None:
 
 
 def _copy_branding() -> None:
-    """Copy Colosseum logo/favicon from a sibling colosseum-core checkout when present."""
+    """Copy Colosseum logo/favicon from a colosseum-core checkout when present."""
     static = SITE_SOURCE / "_static"
     static.mkdir(parents=True, exist_ok=True)
-    core_static = (
-        REPO_ROOT.parent / "colosseum-core" / "docs" / "sphinx" / "source" / "_static"
+    candidates = (
+        REPO_ROOT / ".deps" / "colosseum-core" / "docs" / "sphinx" / "source" / "_static",
+        REPO_ROOT.parent / "colosseum-core" / "docs" / "sphinx" / "source" / "_static",
     )
+    core_static = next((path for path in candidates if path.is_dir()), None)
+    if core_static is None:
+        return
     for name in ("colosseum-logo.png", "colosseum.ico"):
         src = core_static / name
         if src.is_file():
