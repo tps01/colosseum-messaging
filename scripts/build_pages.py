@@ -33,7 +33,10 @@ API_MODULES: tuple[tuple[str, str, str], ...] = (
 # Optional single-function pages: (rst_stem, "module:qualname", displayed name)
 API_FUNCTIONS: tuple[tuple[str, str, str], ...] = (
 )
-GUIDES: tuple[str, ...] = ('docs/sphinx/source/guides/getting_started.rst', 'docs/sphinx/source/guides/protocol_workflows.rst')
+GUIDES: tuple[str, ...] = (
+    "docs/sphinx/source/guides/getting_started.rst",
+    "docs/sphinx/source/guides/protocol_workflows.rst",
+)
 # --- end per-plugin constants ---
 
 HUB_URL = "https://tps01.github.io/colosseum-core/"
@@ -219,8 +222,16 @@ def _copy_branding() -> None:
 def stage() -> None:
     # Fail when a root API export has no reference/navigation entry.
     api_source = REPO_ROOT / "colosseum_messaging" / "api" / "__init__.py"
-    exported = next(ast.literal_eval(node.value) for node in ast.parse(api_source.read_text(encoding="utf-8-sig")).body
-                    if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets))
+    tree = ast.parse(api_source.read_text(encoding="utf-8-sig"))
+    exported = next(
+        ast.literal_eval(node.value)
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "__all__"
+            for target in node.targets
+        )
+    )
     documented = {path.rsplit(".", 1)[-1] for _, _, path in (*API_MODULES, *API_FUNCTIONS)}
     missing = set(exported) - documented
     if missing:
