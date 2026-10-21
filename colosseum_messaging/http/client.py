@@ -16,6 +16,8 @@ _ALLOWED_DRIVERS = frozenset({"sim", "http"})
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _MAX_REDIRECTS = 5
+_SENSITIVE_HEADERS = frozenset({"authorization", "cookie"})
+_BODY_HEADERS = frozenset({"content-length", "transfer-encoding"})
 
 
 class HttpClientWrapper:
@@ -70,10 +72,25 @@ class HttpClientWrapper:
                     and redirects < _MAX_REDIRECTS
                 ):
                     redirects += 1
-                    url = urljoin(url, location)
+                    next_url = urljoin(url, location)
+                    _require_http_url(next_url)
+                    current_origin = _origin(url)
+                    next_origin = _origin(next_url)
+                    if current_origin[0] == "https" and next_origin[0] == "http":
+                        raise ValueError(
+                            f"Refusing HTTPS to HTTP redirect from {url} to {next_url}",
+                        )
+                    # 301/302/303 already become GET with no body, including same-origin.
+                    # 307/308 keep the method and body only while the origin stays the same.
                     if status_code in {301, 302, 303} and method_u not in {"GET", "HEAD"}:
                         method_u = "GET"
                         body = None
+                    if current_origin != next_origin:
+                        req_headers = _headers_without(req_headers, _SENSITIVE_HEADERS)
+                        if body is not None:
+                            body = None
+                            req_headers = _headers_without(req_headers, _BODY_HEADERS)
+                    url = next_url
                     continue
                 break
         except (HTTPException, TimeoutError, OSError, ValueError) as exc:
@@ -126,6 +143,23 @@ class HttpClientWrapper:
 
     def close(self) -> None:
         return
+
+
+def _origin(url: str) -> tuple[str, str, int]:
+    parsed = urlsplit(url)
+    scheme = parsed.scheme.lower()
+    host = (parsed.hostname or "").lower()
+    if parsed.port is not None:
+        port = parsed.port
+    elif scheme == "https":
+        port = 443
+    else:
+        port = 80
+    return scheme, host, port
+
+
+def _headers_without(headers: Mapping[str, str], names: frozenset[str]) -> dict[str, str]:
+    return {name: value for name, value in headers.items() if name.lower() not in names}
 
 
 def _require_http_url(url: str) -> SplitResult:
