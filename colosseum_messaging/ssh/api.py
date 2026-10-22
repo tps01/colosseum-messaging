@@ -32,12 +32,17 @@ def exec(  # noqa: A001
     command: str,
     key: str,
     timeout: float = 30.0,
+    retries: int = 3,
     input: bytes | str | None = None,  # noqa: A002
     get_pty: bool = False,
 ) -> dict[str, object]:
-    """Run a remote command and record exit code plus stdout/stderr."""
+    """Run a remote command and record exit code plus stdout/stderr.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Applies only when opening a connection, never to command execution.
+    """
     _ = key
-    return get_ssh_client(ssh_id).exec(
+    return get_ssh_client(ssh_id, retries=retries).exec(
         command,
         timeout=timeout,
         input_data=input,
@@ -46,10 +51,16 @@ def exec(  # noqa: A001
 
 
 @measurement
-def measure_stdout(*, ssh_id: int, command: str, key: str, timeout: float = 30.0) -> str:
-    """Run a remote command and record stdout (stripped)."""
+def measure_stdout(
+    *, ssh_id: int, command: str, key: str, timeout: float = 30.0, retries: int = 3,
+) -> str:
+    """Run a remote command and record stdout (stripped).
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    return get_ssh_client(ssh_id).exec_stdout(command, timeout=timeout)
+    return get_ssh_client(ssh_id, retries=retries).exec_stdout(command, timeout=timeout)
 
 
 @measurement
@@ -61,10 +72,15 @@ def exec_sequence(
     script: str | None = None,
     interpreter: str | None = None,
     timeout: float = 30.0,
+    retries: int = 3,
 ) -> dict[str, object]:
-    """Run a local script file or inline script as one remote process."""
+    """Run a local script file or inline script as one remote process.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    return get_ssh_client(ssh_id).exec_sequence(
+    return get_ssh_client(ssh_id, retries=retries).exec_sequence(
         path=path,
         script=script,
         interpreter=interpreter,
@@ -73,17 +89,29 @@ def exec_sequence(
 
 
 @command
-def start(*, ssh_id: int, command: str, key: str, timeout: float = 30.0) -> None:
-    """Start a remote command in the background; stdout/stderr stream to run artifacts."""
+def start(
+    *, ssh_id: int, command: str, key: str, timeout: float = 30.0, retries: int = 3,
+) -> None:
+    """Start a remote command in the background; stdout/stderr stream to run artifacts.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    get_ssh_client(ssh_id).start(command, key, timeout=timeout)
+    get_ssh_client(ssh_id, retries=retries).start(command, key, timeout=timeout)
 
 
 @measurement
-def collect(*, ssh_id: int, key: str, timeout: float = 30.0) -> dict[str, object]:
-    """Wait for a background command and record exit code plus stdout/stderr."""
+def collect(
+    *, ssh_id: int, key: str, timeout: float = 30.0, retries: int = 3,
+) -> dict[str, object]:
+    """Wait for a background command and record exit code plus stdout/stderr.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    return get_ssh_client(ssh_id).collect(key, timeout=timeout)
+    return get_ssh_client(ssh_id, retries=retries).collect(key, timeout=timeout)
 
 
 @command
@@ -95,10 +123,15 @@ def put(
     key: str = "",
     recursive: bool = False,
     max_depth: int | None = None,
+    retries: int = 3,
 ) -> None:
-    """Upload local file(s) to the remote host via SFTP."""
+    """Upload local file(s) to the remote host via SFTP.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    get_ssh_client(ssh_id).sftp_put(
+    get_ssh_client(ssh_id, retries=retries).sftp_put(
         local, remote, recursive=recursive, max_depth=max_depth,
     )
 
@@ -112,12 +145,17 @@ def get(
     key: str,
     recursive: bool = False,
     max_depth: int | None = None,
+    retries: int = 3,
     newest: int | None = None,
     oldest: int | None = None,
 ) -> list[str]:
-    """Download remote file(s) via SFTP."""
+    """Download remote file(s) via SFTP.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    return get_ssh_client(ssh_id).sftp_get(
+    return get_ssh_client(ssh_id, retries=retries).sftp_get(
         remote,
         local,
         recursive=recursive,
@@ -128,31 +166,49 @@ def get(
 
 
 @measurement
-def listdir(*, ssh_id: int, path: str, key: str) -> list[str]:
-    """List a remote directory via SFTP."""
+def listdir(*, ssh_id: int, path: str, key: str, retries: int = 3) -> list[str]:
+    """List a remote directory via SFTP.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    return get_ssh_client(ssh_id).sftp_listdir(path)
+    return get_ssh_client(ssh_id, retries=retries).sftp_listdir(path)
 
 
 @command
-def mkdir(*, ssh_id: int, path: str, key: str = "") -> None:
-    """Create a remote directory via SFTP."""
+def mkdir(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
+    """Create a remote directory via SFTP.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    get_ssh_client(ssh_id).sftp_mkdir(path)
+    get_ssh_client(ssh_id, retries=retries).sftp_mkdir(path)
 
 
 @command
-def remove(*, ssh_id: int, path: str, key: str = "") -> None:
-    """Remove a remote file via SFTP."""
+def remove(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
+    """Remove a remote file via SFTP.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    get_ssh_client(ssh_id).sftp_remove(path)
+    get_ssh_client(ssh_id, retries=retries).sftp_remove(path)
 
 
 @command
-def rename(*, ssh_id: int, old: str, new: str, key: str = "") -> None:
-    """Rename a remote path via SFTP."""
+def rename(
+    *, ssh_id: int, old: str, new: str, key: str = "", retries: int = 3,
+) -> None:
+    """Rename a remote path via SFTP.
+
+    :param retries: Total connection attempts (default 3); 0 disables retries.
+        Cached connections are reused; operations are never replayed.
+    """
     _ = key
-    get_ssh_client(ssh_id).sftp_rename(old, new)
+    get_ssh_client(ssh_id, retries=retries).sftp_rename(old, new)
 
 
 def _lookup_ssh_measurement(key: str, commands: tuple[str, ...]) -> object | None:

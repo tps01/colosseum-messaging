@@ -102,6 +102,22 @@ Paramiko's normal agent/key lookup applies. ``auth="none"`` is an explicit mode
 for hosts that support it, not a fallback after failed authentication. Paths in
 the config are process-relative unless absolute.
 
+Connection setup makes up to three attempts by default. SSH calls that acquire
+a connection accept ``retries=3``: this counts **total attempts**, including the
+first. ``retries=1`` or ``retries=0`` makes one attempt; negative values and
+non-integers are rejected. The row's ``timeout`` defaults to **10 seconds** and
+bounds TCP connection, banner exchange and authentication separately in both
+normal and ``auth="none"`` modes. Three TCP timeouts therefore take about 30
+seconds; DNS and successive handshake phases can add time. Explicit row timeouts
+are preserved. API ``timeout=`` continues to control command execution or job
+collection independently.
+
+Only connection establishment is retried. Authentication rejection, untrusted
+host keys and invalid local files/configuration fail immediately. Failed clients
+are closed; successful clients are cached. A later call reuses the cached client
+without reconnecting. Commands and file transfers are never replayed after an
+operation starts, including when the connection drops.
+
 In a CLI-managed ``main`` with that row loaded::
 
    col.messaging.ssh.exec(ssh_id=1, command="printf 'ready\\n'", timeout=5.0, key="ready")
