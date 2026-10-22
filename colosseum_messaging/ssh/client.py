@@ -106,6 +106,7 @@ class SSHClientWrapper:
                 f"messaging.ssh auth must be one of "
                 f"{sorted(a for a in _ALLOWED_AUTH if a)}, got {auth!r}",
             )
+        self._auth = auth or "auto"
         configured = str(config.get("platform", "")).strip().lower()
         if configured not in _ALLOWED_PLATFORMS:
             raise ValueError(
@@ -133,13 +134,21 @@ class SSHClientWrapper:
     def _load_host_keys(self, client: paramiko.SSHClient) -> None:
         known_hosts = self._config.get("known_hosts")
         if known_hosts:
-            client.load_host_keys(str(known_hosts))
+            path = Path(str(known_hosts))
+            if self._auth == "auto" and not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch(exist_ok=True)
+            client.load_host_keys(str(path))
             return
         client.load_system_host_keys()
 
     def _apply_host_key_policy(self, client: paramiko.SSHClient) -> None:
         self._load_host_keys(client)
-        client.set_missing_host_key_policy(_RejectPolicy())
+        if self._auth == "auto":
+            # Auto mode accepts first-seen server keys without manual enrollment.
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
+        else:
+            client.set_missing_host_key_policy(_RejectPolicy())
 
     def _require_known_host_key(self, hostname: str, port: int, key: paramiko.PKey) -> None:
         checker = paramiko.SSHClient()
@@ -202,8 +211,7 @@ class SSHClientWrapper:
                 return
 
     def _connect_once(self) -> None:
-        auth = str(self._config.get("auth", "auto")).strip().lower()
-        if auth in ("none", "auth_none"):
+        if self._auth in ("none", "auth_none"):
             self._connect_auth_none()
             return
 

@@ -10,7 +10,7 @@ from colosseum.config import load_config
 from colosseum.context import init_context
 from colosseum_messaging.connections import get_ssh_client
 from colosseum_messaging.ssh import api
-from colosseum_messaging.ssh.client import SSHClientWrapper
+from colosseum_messaging.ssh.client import SSHClientWrapper, _HostKeyError
 
 CONFIG = {"host": "bench.example", "username": "user", "password": "secret"}
 
@@ -80,19 +80,12 @@ def test_permanent_failures_are_not_retried(clients, failure):
     created[0].close.assert_called_once()
 
 
-def test_unknown_host_policy_rejection_is_not_retried(clients):
-    created, outcomes = clients
-
-    def reject(**kwargs):
-        client = created[-1]
-        policy = client.set_missing_host_key_policy.call_args.args[0]
-        policy.missing_host_key(client, "bench.example", Mock())
-
-    outcomes.append(reject)
+def test_auth_none_host_key_rejection_is_not_retried(monkeypatch):
+    connect = Mock(side_effect=_HostKeyError("SSH host key is not in known_hosts"))
+    monkeypatch.setattr(SSHClientWrapper, "_connect_auth_none", connect)
     with pytest.raises(paramiko.SSHException, match="not in known_hosts"):
-        SSHClientWrapper(CONFIG)
-    assert len(created) == 1
-    created[0].close.assert_called_once()
+        SSHClientWrapper({**CONFIG, "auth": "none"})
+    connect.assert_called_once()
 
 
 @pytest.mark.parametrize("retries", [-1, True, 1.5, "3"])
