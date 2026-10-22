@@ -134,8 +134,11 @@ PowerShell, supply an interpreter explicitly::
 
 For local ``path=`` scripts, ``.bat``/``.cmd`` use cmd, ``.ps1`` uses PowerShell,
 and ``.sh``/``.bash`` use bash. An interpreter containing ``{remote}`` selects
-upload-and-execute; otherwise the script is sent over stdin. Do not assume
-bare inline scripts get POSIX shell semantics on Windows.
+upload-and-execute: the script is written under a writable remote temporary
+directory, keeps its ``.ps1``, ``.bat``, or ``.cmd`` suffix, and is removed
+after the command. The substituted path is quoted for the selected interpreter.
+Otherwise the script is sent over stdin. Do not assume bare inline scripts get
+POSIX shell semantics on Windows.
 
 Transfer selection and evidence
 -------------------------------
@@ -163,9 +166,11 @@ Using the same prepared local file and remote scratch directory::
 
 ``recursive=True`` descends directories; ``max_depth`` bounds descent.
 ``newest`` / ``oldest`` select by remote modification time and are mutually
-exclusive. Globs are resolved by the plugin, not a remote shell. Windows drive
-paths are accepted and matching is platform-aware. This is selection of files,
-not a guarantee that a producer has finished writing them.
+exclusive. Globs are resolved by the plugin, not a remote shell. A glob matches
+file basenames throughout the selected tree and does not filter directory
+names. Windows drive paths are accepted and matching is platform-aware. This
+is selection of files, not a guarantee that a producer has finished writing
+them.
 
 Verification-only reuses recorded responses/results for row-based verifiers.
 It does not contact a server to repeat skipped acquisitions, download missing

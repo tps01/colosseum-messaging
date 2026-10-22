@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colosseum-messaging"
-version = "0.4.3"
+version = "0.5.0"
 description = "Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH, SCP)"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 dependencies = [
   "colosseum-core>=0.17.0,<0.18",
   "redis>=5,<6",
-  "pyzmq>=26,<27",
+  "pyzmq>=27.2,<28",
   "paho-mqtt>=2,<3",
   "paramiko>=3.0,<4",
   "scp>=0.14,<1",

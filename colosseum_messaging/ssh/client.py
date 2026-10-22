@@ -4,7 +4,7 @@ import contextlib
 import threading
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import paramiko
 from colosseum.logging import get_logger
@@ -29,6 +29,34 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.ssh")
+
+
+class _HostKeyStore(Protocol):
+    def lookup(self, hostname: str) -> object | None: ...
+
+    def check(self, hostname: str, key: paramiko.PKey) -> bool: ...
+
+
+def _store_trusts_key(
+    store: _HostKeyStore, host_id: str, key: paramiko.PKey,
+) -> bool | None:
+    """Return True/False when ``host_id`` is present, or None when it is absent."""
+    if store.lookup(host_id) is None:
+        return None
+    return bool(store.check(host_id, key))
+
+
+def _quote_remote_path(path: str, *, windows: bool) -> str:
+    if windows:
+        return '"' + path.replace('"', '""') + '"'
+    return "'" + path.replace("'", "'\"'\"'") + "'"
+
+
+def _command_with_remote(template: str, remote_path: str, *, windows: bool) -> str:
+    if '"{remote}"' in template or "'{remote}'" in template:
+        return template.format(remote=remote_path)
+    return template.format(remote=_quote_remote_path(remote_path, windows=windows))
+
 
 ExecResult = dict[str, object]
 _ALLOWED_DRIVERS = frozenset({"sim", "ssh"})
@@ -92,8 +120,25 @@ class SSHClientWrapper:
         checker = paramiko.SSHClient()
         self._apply_host_key_policy(checker)
         host_id = hostname if port == 22 else f"[{hostname}]:{port}"
-        if checker.get_host_keys().check(host_id, key):
-            return
+        # load_system_host_keys fills a separate store from get_host_keys().
+        stores = (
+            getattr(checker, "_system_host_keys", None),
+            checker.get_host_keys(),
+        )
+        known = False
+        for store in stores:
+            if store is None:
+                continue
+            trusted = _store_trusts_key(store, host_id, key)
+            if trusted is None:
+                continue
+            known = True
+            if trusted:
+                return
+        if known:
+            raise paramiko.SSHException(
+                f"SSH host key for {host_id} does not match known_hosts",
+            )
         raise paramiko.SSHException(f"SSH host key for {host_id} is not in known_hosts")
 
     def _require_sim_fs(self) -> SimRemoteFS:
@@ -241,13 +286,16 @@ class SSHClientWrapper:
                 input_data=body,
             )
 
-        remote_name = f"colosseum-{uuid.uuid4().hex}"
-        remote_path = normalize_remote_path(remote_name)
         sftp_client = self._require_sftp()
+        remote_path = self._sequence_remote_path(sftp_client, suffix)
         try:
             with sftp_client.file(remote_path, "wb") as remote_file:
                 remote_file.write(body)
-            command = delivery["command"].format(remote=remote_path)
+            command = _command_with_remote(
+                delivery["command"],
+                remote_path,
+                windows=self.get_platform() == "windows",
+            )
             result = self.exec(command, timeout=timeout)
         finally:
             with contextlib.suppress(OSError):
@@ -289,6 +337,25 @@ class SSHClientWrapper:
             )
         return {"mode": "stdin", "command": "bash -s"}
 
+    def _sequence_remote_path(self, sftp: paramiko.SFTPClient, suffix: str) -> str:
+        directory = self._writable_remote_directory(sftp)
+        name = f"colosseum-{uuid.uuid4().hex}{suffix}"
+        return normalize_remote_path(f"{directory}/{name}")
+
+    def _writable_remote_directory(self, sftp: paramiko.SFTPClient) -> str:
+        normalize = getattr(sftp, "normalize", None)
+        current: object = None
+        if callable(normalize):
+            try:
+                current = normalize(".")
+            except OSError:
+                current = None
+        if current:
+            return str(current).rstrip("/\\")
+        if self.get_platform() == "windows":
+            return "C:/Users/Public"
+        return "/tmp"
+
     def start(
         self,
         command: str,
@@ -320,13 +387,26 @@ class SSHClientWrapper:
         client = self._require_client()
         _stdin, stdout, stderr = client.exec_command(command, timeout=timeout)  # nosec B601
         channel = stdout.channel
+        job = BackgroundJob(
+            key=key,
+            command=command,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            thread=None,
+            channel=channel,
+        )
 
         def _on_complete(code: int) -> None:
-            with self._jobs_lock:
-                active = self._jobs.get(key)
-                if active is not None:
-                    active.exit_code = code
-                    active.done.set()
+            if job.abandoned:
+                return
+            job.exit_code = code
+            job.done.set()
+
+        def _on_error(exc: BaseException) -> None:
+            if job.abandoned:
+                return
+            job.error = exc
+            job.done.set()
 
         thread = start_background_reader(
             stdout_path=stdout_path,
@@ -334,17 +414,12 @@ class SSHClientWrapper:
             stdout_file=stdout,
             stderr_file=stderr,
             on_complete=_on_complete,
+            on_error=_on_error,
         )
-        job = BackgroundJob(
-            key=key,
-            command=command,
-            stdout_path=stdout_path,
-            stderr_path=stderr_path,
-            thread=thread,
-            channel=channel,
-        )
+        job.thread = thread
         with self._jobs_lock:
             self._jobs[key] = job
+        thread.start()
         return str(stdout_path), str(stderr_path)
 
     def collect(self, key: str, *, timeout: float = 30.0) -> ExecResult:
@@ -353,10 +428,18 @@ class SSHClientWrapper:
         if job is None:
             raise KeyError(f"No background SSH job for key {key!r}")
 
-        if not job.done.wait(timeout=timeout):
+        if job.abandoned or (
+            not job.done.wait(timeout=timeout) and not job.done.is_set()
+        ):
+            job.abandoned = True
             if job.channel is not None:
                 job.channel.close()
-            job.done.set()
+            raise TimeoutError(f"SSH job {key!r} did not complete within {timeout}s")
+        if job.error is not None:
+            raise RuntimeError(f"SSH job {key!r} failed while reading output") from job.error
+        if job.exit_code is None:
+            job.abandoned = True
+            raise TimeoutError(f"SSH job {key!r} did not complete within {timeout}s")
 
         stdout_text = (
             job.stdout_path.read_text(encoding="utf-8", errors="replace")
@@ -368,8 +451,11 @@ class SSHClientWrapper:
             if job.stderr_path.exists()
             else ""
         )
-        code = 0 if job.exit_code is None else int(job.exit_code)
-        return {"exit_code": code, "stdout": stdout_text, "stderr": stderr_text}
+        return {
+            "exit_code": int(job.exit_code),
+            "stdout": stdout_text,
+            "stderr": stderr_text,
+        }
 
     def _require_sftp(self) -> paramiko.SFTPClient:
         if self._sftp is None:
