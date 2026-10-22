@@ -31,7 +31,7 @@ def test_os_release_marker_command() -> None:
 
 
 def test_ssh_rejects_unknown_host_keys_by_default(monkeypatch) -> None:
-    policies: list[str] = []
+    policies: list[bool] = []
 
     class _FakeClient:
         def load_system_host_keys(self) -> None:
@@ -41,7 +41,7 @@ def test_ssh_rejects_unknown_host_keys_by_default(monkeypatch) -> None:
             return None
 
         def set_missing_host_key_policy(self, policy: object) -> None:
-            policies.append(type(policy).__name__)
+            policies.append(isinstance(policy, paramiko.RejectPolicy))
 
         def connect(self, **kwargs: object) -> None:
             return None
@@ -50,4 +50,4 @@ def test_ssh_rejects_unknown_host_keys_by_default(monkeypatch) -> None:
     SSHClientWrapper(
         {"driver": "ssh", "host": "dut.local", "username": "pi", "password": "secret"},
     )
-    assert policies == ["RejectPolicy"]
+    assert policies == [True]
