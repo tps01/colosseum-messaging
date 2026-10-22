@@ -90,17 +90,24 @@ The same ``messaging.ssh`` row serves SSH, SFTP and SCP; there is no separate
    ssh_id = 1
    host = "bench.example"
    username = "test"
+   auth = "auto"
    key_filename = "C:/bench/keys/id_ed25519"
    known_hosts = "C:/bench/keys/known_hosts"
    timeout = 10.0
    platform = "linux"
 
-Host keys must already be trusted in the configured file or system host-key
-store; unknown keys are rejected. ``key_filename`` selects key authentication;
-otherwise a configured ``password`` disables agent/key discovery. Without either,
-Paramiko's normal agent/key lookup applies. ``auth="none"`` is an explicit mode
-for hosts that support it, not a fallback after failed authentication. Paths in
-the config are process-relative unless absolute.
+``auth="auto"`` (the default) connects to both known and first-seen hosts.
+It uses Paramiko's ``AutoAddPolicy`` to accept new host keys automatically;
+when ``known_hosts`` names a file, new keys are saved there (the file and its
+parent directories are created when needed). Without an explicit
+file, newly accepted keys are kept for the connection's lifetime. Existing
+known keys are checked against the server's key.
+
+``key_filename`` selects key authentication; otherwise a configured ``password``
+disables agent/key discovery. Without either, Paramiko's normal agent/key lookup
+applies. ``auth="none"`` is an explicit mode for hosts that support it and still
+requires a trusted host key, not a fallback after failed authentication. Paths
+in the config are process-relative unless absolute.
 
 Connection setup makes up to three attempts by default. SSH calls that acquire
 a connection accept ``retries=3``: this counts **total attempts**, including the
@@ -112,8 +119,9 @@ seconds; DNS and successive handshake phases can add time. Explicit row timeouts
 are preserved. API ``timeout=`` continues to control command execution or job
 collection independently.
 
-Only connection establishment is retried. Authentication rejection, untrusted
-host keys and invalid local files/configuration fail immediately. Failed clients
+Only connection establishment is retried. Authentication rejection, mismatched
+known keys, untrusted keys in ``auth="none"`` mode, and invalid local
+files/configuration fail immediately. Failed clients
 are closed; successful clients are cached. A later call reuses the cached client
 without reconnecting. Commands and file transfers are never replayed after an
 operation starts, including when the connection drops.

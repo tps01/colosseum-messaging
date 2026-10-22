@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colosseum-messaging"
-version = "0.6.0"
+version = "0.6.1"
 description = "Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH, SCP)"
 readme = "README.md"
 requires-python = ">=3.9"

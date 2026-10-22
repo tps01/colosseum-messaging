@@ -30,7 +30,7 @@ def test_os_release_marker_command() -> None:
     assert "present" in out
 
 
-def test_ssh_rejects_unknown_host_keys_by_default(monkeypatch) -> None:
+def test_ssh_auto_accepts_unknown_host_keys_by_default(monkeypatch) -> None:
     policies: list[bool] = []
 
     class _FakeClient:
@@ -41,7 +41,7 @@ def test_ssh_rejects_unknown_host_keys_by_default(monkeypatch) -> None:
             return None
 
         def set_missing_host_key_policy(self, policy: object) -> None:
-            policies.append(isinstance(policy, paramiko.RejectPolicy))
+            policies.append(isinstance(policy, paramiko.AutoAddPolicy))
 
         def connect(self, **kwargs: object) -> None:
             return None
