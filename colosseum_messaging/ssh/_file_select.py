@@ -44,6 +44,12 @@ def select_remote_files(
     oldest: int | None = None,
     case_sensitive: bool = True,
 ) -> list[tuple[str, float]]:
+    """Select remote files.
+
+    Globs apply to basenames throughout the selected tree. ``recursive=True``
+    descends into subdirectories without using the glob to filter directory
+    names; the same filename filter keeps matching files at every level.
+    """
     if newest is not None and oldest is not None:
         raise ValueError("newest and oldest are mutually exclusive")
 
@@ -70,7 +76,7 @@ def select_remote_files(
             mtime = float(getattr(attr, "st_mtime", 0) or 0)
             if _is_dir(mode):
                 if recursive and (max_depth is None or depth < max_depth):
-                    walk_dir(child, depth + 1, None)
+                    walk_dir(child, depth + 1, name_pattern)
             elif name_pattern is None or fnmatch_name(
                 name, name_pattern, case_sensitive=case_sensitive,
             ):
@@ -113,6 +119,7 @@ def select_local_files(
     recursive: bool = False,
     max_depth: int | None = None,
 ) -> list[tuple[Path, float]]:
+    """Select local files. A glob matches basenames and stays in effect while descending."""
     path = Path(local)
     if not path_has_glob(path.name):
         if path.is_file():
@@ -188,8 +195,8 @@ def map_remote_get_paths(
             dest = local_root / Path(*rel.split("/"))
         else:
             dest = local_root / remote_basename(remote_path)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        mapped.append((remote_path, dest))
+        # Recheck the fully constructed destination, not only the local root.
+        mapped.append((remote_path, resolve_local(str(dest))))
     return mapped
 
 
@@ -198,28 +205,43 @@ def map_local_put_paths(
     local_spec: str,
     remote: str,
 ) -> list[tuple[Path, str]]:
+    """Map selected local files to remote destinations.
+
+    A remote path is a single-file rename when exactly one local file is
+    selected and ``remote`` does not end with a slash. That file is stored at
+    the normalized remote path.
+
+    Otherwise ``remote`` is a directory, including a trailing slash or more
+    than one selected file. Each file is placed under that directory. The
+    recursive root is the local directory being walked, or the parent of a
+    glob. Paths below that root are preserved; the root directory's own name
+    is not repeated.
+    """
     if not local_files:
         return []
 
-    remote_normalized = normalize_remote_path(remote)
-    remote_name = remote_basename(remote_normalized)
-    remote_parent = remote_dirname(remote_normalized)
-    has_glob = path_has_glob(remote_name) or path_has_glob(Path(local_spec).name)
-    multi = len(local_files) > 1 or has_glob
+    if len(local_files) == 1 and not remote.endswith(("/", "\\")):
+        return [(local_files[0], normalize_remote_path(remote))]
 
-    if not multi:
-        return [(local_files[0], remote_normalized)]
-
+    remote_root = normalize_remote_path(remote)
+    local_root = _local_selection_root(local_spec)
     mapped: list[tuple[Path, str]] = []
-    local_root = Path(local_spec).parent.resolve()
     for local_path in local_files:
         try:
-            rel = local_path.relative_to(local_root)
+            relative = local_path.resolve().relative_to(local_root)
         except ValueError:
-            rel = Path(local_path.name)
-        remote_dest = _join_remote(remote_parent, rel.as_posix())
-        mapped.append((local_path, remote_dest))
+            relative = Path(local_path.name)
+        mapped.append((local_path, _join_remote(remote_root, relative.as_posix())))
     return mapped
+
+
+def _local_selection_root(local_spec: str) -> Path:
+    spec = Path(local_spec)
+    if path_has_glob(spec.name):
+        return spec.parent.resolve()
+    if local_spec.endswith(("/", "\\")) or spec.is_dir():
+        return spec.resolve()
+    return spec.parent.resolve()
 
 
 def _relative_remote(root: str, path: str) -> str:

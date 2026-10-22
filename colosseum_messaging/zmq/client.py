@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from colosseum.logging import get_logger
@@ -76,11 +77,21 @@ class ZmqClientWrapper:
             raise RuntimeError("ZMQ receive requires socket='sub'")
         _logger.debug("ZMQ RECEIVE endpoint=%s timeout=%ss", self._endpoint, timeout)
         if self._sim:
-            item = SIM_MAILBOX.receive(self._endpoint, timeout)
-            if item is None:
-                raise TimeoutError(f"No ZMQ message on {self._endpoint!r} within {timeout}s")
-            topic, payload = item
-            return {"topic": topic, "payload": payload}
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"No ZMQ message on {self._endpoint!r} within {timeout}s",
+                    )
+                item = SIM_MAILBOX.receive(self._endpoint, remaining)
+                if item is None:
+                    raise TimeoutError(
+                        f"No ZMQ message on {self._endpoint!r} within {timeout}s",
+                    )
+                topic, payload = item
+                if topic.startswith(self._topic):
+                    return {"topic": topic, "payload": payload}
         if self._socket is None:
             raise RuntimeError("ZMQ socket is not connected")
         self._socket.setsockopt(zmq.RCVTIMEO, int(max(timeout, 0.0) * 1000))
