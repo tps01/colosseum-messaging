@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from colosseum.logging import get_logger
@@ -98,17 +99,17 @@ class RedisClientWrapper:
             self._pubsub.subscribe(channel)  # type: ignore[union-attr]
             self._subscribed_channel = channel
         pubsub = self._pubsub
-        message = pubsub.get_message(timeout=timeout)  # type: ignore[union-attr]
-        if message is None or message.get("type") != "message":
-            deadline = timeout
-            waited = 0.0
-            step = min(0.1, max(0.01, timeout))
-            while waited < deadline:
-                message = pubsub.get_message(timeout=step)  # type: ignore[union-attr]
-                waited += step
-                if message is not None and message.get("type") == "message":
-                    break
-            else:
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining < 0:
+                remaining = 0.0
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"No Redis message on channel {channel!r} within {timeout}s")
+            message = pubsub.get_message(timeout=remaining)  # type: ignore[union-attr]
+            if message is not None and message.get("type") == "message":
+                break
+            if time.monotonic() >= deadline:
                 raise TimeoutError(f"No Redis message on channel {channel!r} within {timeout}s")
         data = message.get("data")
         payload = "" if data is None else str(data)

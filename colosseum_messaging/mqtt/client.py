@@ -88,7 +88,7 @@ class MqttClientWrapper:
                         f"No MQTT message on {subscribe_topic!r} within {timeout}s",
                     )
                 msg_topic, payload = item
-                if topic is None or _topic_matches(subscribe_topic, msg_topic):
+                if _topic_matches(subscribe_topic, msg_topic):
                     return {"topic": msg_topic, "payload": payload}
                 if remaining <= 0:
                     raise TimeoutError(

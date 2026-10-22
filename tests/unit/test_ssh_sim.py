@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import paramiko
+from colosseum_messaging.ssh._sim import sim_exec_result
 from colosseum_messaging.ssh.client import SSHClientWrapper
 
 
@@ -10,6 +13,15 @@ def test_version_command_returns_semver_like_string() -> None:
     client = SSHClientWrapper({"driver": "sim", "host": "sim.local", "username": "pi"})
     out = client.exec_stdout("cat /etc/version")
     assert "v1.2.3" in out
+
+
+def test_readme_example_matches_simulator_stdout() -> None:
+    readme = Path(__file__).resolve().parents[2] / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    assert 'command="cat /etc/version"' in text
+    assert r'pattern=r"v1\.2\.3"' in text
+    result = sim_exec_result("cat /etc/version")
+    assert "v1.2.3" in str(result["stdout"])
 
 
 def test_os_release_marker_command() -> None:
