@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING, TypeVar
 
 from colosseum.config.loader import ConfigError
@@ -10,7 +11,7 @@ from colosseum_messaging._cache import cached_resource, close_cached_resources
 from colosseum_messaging.http.client import HttpClientWrapper
 from colosseum_messaging.mqtt.client import MqttClientWrapper
 from colosseum_messaging.redis.client import RedisClientWrapper
-from colosseum_messaging.ssh.client import SSHClientWrapper
+from colosseum_messaging.ssh.client import SSHClientWrapper, _connection_attempts
 from colosseum_messaging.zmq.client import ZmqClientWrapper
 
 if TYPE_CHECKING:
@@ -106,12 +107,13 @@ def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
     )
 
 
-def get_ssh_client(ssh_id: int) -> SSHClientWrapper:
+def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
+    _connection_attempts(retries)
     return _cached_client(
         section="messaging.ssh",
         item_id=ssh_id,
         cache_prefix="messaging:ssh",
-        wrapper_cls=SSHClientWrapper,
+        wrapper_cls=partial(SSHClientWrapper, retries=retries),
         default_driver="ssh",
         detail=lambda cfg: f"host={cfg.get('host')}",
     )

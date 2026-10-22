@@ -74,3 +74,9 @@ pytest
 ruff check .
 mypy
 ```
+
+SSH connection setup defaults to three total attempts with a 10-second timeout
+per connection phase. Pass `retries=` to SSH operations to override the attempt
+count (`0` or `1` makes one attempt). The SSH config row's `timeout` overrides
+the connection timeout; command `timeout=` is independent. Only connection setup
+is retried; remote operations are never replayed.

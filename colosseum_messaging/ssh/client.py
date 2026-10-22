@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import contextlib
+import errno
+import math
+import socket
 import threading
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, NoReturn, Protocol
 
 import paramiko
 from colosseum.logging import get_logger
@@ -29,6 +32,24 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _logger = get_logger("colosseum.messaging.ssh")
+
+
+class _HostKeyError(paramiko.SSHException):
+    """Permanent host-key rejection; reconnecting cannot establish trust."""
+
+
+class _RejectPolicy(paramiko.RejectPolicy):
+    def missing_host_key(
+        self, client: paramiko.SSHClient, hostname: str, key: paramiko.PKey,
+    ) -> NoReturn:
+        _ = client, key
+        raise _HostKeyError(f"SSH host key for {hostname} is not in known_hosts")
+
+
+def _connection_attempts(retries: int) -> int:
+    if isinstance(retries, bool) or not isinstance(retries, int) or retries < 0:
+        raise ValueError("retries must be a non-negative integer")
+    return max(1, retries)
 
 
 class _HostKeyStore(Protocol):
@@ -65,7 +86,8 @@ _ALLOWED_PLATFORMS = frozenset({"", "linux", "windows"})
 
 
 class SSHClientWrapper:
-    def __init__(self, config: Mapping[str, object]) -> None:
+    def __init__(self, config: Mapping[str, object], *, retries: int = 3) -> None:
+        attempts = _connection_attempts(retries)
         self._config = dict(config)
         self._client: paramiko.SSHClient | None = None
         self._sftp: paramiko.SFTPClient | None = None
@@ -99,7 +121,10 @@ class SSHClientWrapper:
         else:
             self._sim = False
             self._sim_fs = None
-            self._connect_paramiko()
+            self._connect_timeout = float(str(config.get("timeout", 10.0)))
+            if not math.isfinite(self._connect_timeout) or self._connect_timeout <= 0:
+                raise ValueError("messaging.ssh timeout must be a positive finite number")
+            self._connect_paramiko(attempts)
 
     @property
     def is_sim(self) -> bool:
@@ -114,7 +139,7 @@ class SSHClientWrapper:
 
     def _apply_host_key_policy(self, client: paramiko.SSHClient) -> None:
         self._load_host_keys(client)
-        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        client.set_missing_host_key_policy(_RejectPolicy())
 
     def _require_known_host_key(self, hostname: str, port: int, key: paramiko.PKey) -> None:
         checker = paramiko.SSHClient()
@@ -136,10 +161,10 @@ class SSHClientWrapper:
             if trusted:
                 return
         if known:
-            raise paramiko.SSHException(
+            raise _HostKeyError(
                 f"SSH host key for {host_id} does not match known_hosts",
             )
-        raise paramiko.SSHException(f"SSH host key for {host_id} is not in known_hosts")
+        raise _HostKeyError(f"SSH host key for {host_id} is not in known_hosts")
 
     def _require_sim_fs(self) -> SimRemoteFS:
         sim_fs = self._sim_fs
@@ -147,19 +172,48 @@ class SSHClientWrapper:
             raise RuntimeError("SSH sim filesystem is not initialized")
         return sim_fs
 
-    def _connect_paramiko(self) -> None:
+    def _connect_paramiko(self, attempts: int) -> None:
+        for attempt in range(1, attempts + 1):
+            _logger.debug("SSH connection attempt %d/%d", attempt, attempts)
+            try:
+                self._connect_once()
+            except (paramiko.AuthenticationException, paramiko.BadHostKeyException, _HostKeyError):
+                raise
+            except (OSError, EOFError, paramiko.SSHException) as exc:
+                # Local file/permission errors and permanent DNS errors are not transient.
+                if isinstance(exc, OSError) and not (
+                    isinstance(exc, (ConnectionError, TimeoutError,
+                                     paramiko.ssh_exception.NoValidConnectionsError))
+                    or exc.errno in {
+                        errno.ETIMEDOUT, errno.ECONNREFUSED, errno.ECONNRESET,
+                        errno.ECONNABORTED, errno.ENETUNREACH, errno.EHOSTUNREACH,
+                        errno.ENETDOWN, errno.EPIPE,
+                    }
+                    or (isinstance(exc, socket.gaierror) and exc.errno == socket.EAI_AGAIN)
+                ):
+                    raise
+                if attempt == attempts:
+                    raise
+                _logger.warning(
+                    "SSH connection attempt %d/%d failed (%s); retrying",
+                    attempt, attempts, type(exc).__name__,
+                )
+            else:
+                return
+
+    def _connect_once(self) -> None:
         auth = str(self._config.get("auth", "auto")).strip().lower()
         if auth in ("none", "auth_none"):
             self._connect_auth_none()
             return
 
-        client = paramiko.SSHClient()
-        self._apply_host_key_policy(client)
         connect_kwargs: dict[str, Any] = {
             "hostname": str(self._config["host"]),
             "port": int(str(self._config.get("port", 22))),
             "username": str(self._config["username"]),
-            "timeout": float(str(self._config.get("timeout", 30.0))),
+            "timeout": self._connect_timeout,
+            "banner_timeout": self._connect_timeout,
+            "auth_timeout": self._connect_timeout,
         }
         password = self._config.get("password")
         key_filename = self._config.get("key_filename") or ""
@@ -169,8 +223,14 @@ class SSHClientWrapper:
             connect_kwargs["password"] = str(password)
             connect_kwargs["allow_agent"] = False
             connect_kwargs["look_for_keys"] = False
-        client.connect(**connect_kwargs)
-        self._client = client
+        client = paramiko.SSHClient()
+        try:
+            self._apply_host_key_policy(client)
+            client.connect(**connect_kwargs)
+            self._client = client
+        finally:
+            if self._client is not client:
+                client.close()
         _logger.debug(
             "SSH connected to %s:%s as %s",
             connect_kwargs["hostname"],
@@ -182,23 +242,31 @@ class SSHClientWrapper:
         hostname = str(self._config["host"])
         port = int(str(self._config.get("port", 22)))
         username = str(self._config["username"])
-        timeout = float(str(self._config.get("timeout", 30.0)))
-        transport = paramiko.Transport((hostname, port))
-        transport.banner_timeout = timeout
-        transport.auth_timeout = timeout
-        transport.start_client(timeout=timeout)
+        timeout = self._connect_timeout
+        # Transport((host, port)) opens a socket without our TCP connection timeout.
+        sock = socket.create_connection((hostname, port), timeout=timeout)
+        transport: paramiko.Transport | None = None
+        client: paramiko.SSHClient | None = None
         try:
+            transport = paramiko.Transport(sock)
+            transport.banner_timeout = timeout
+            transport.auth_timeout = timeout
+            transport.start_client(timeout=timeout)
             remote_key = transport.get_remote_server_key()
             self._require_known_host_key(hostname, port, remote_key)
-        except (OSError, paramiko.SSHException):
-            transport.close()
-            raise
-        transport.auth_none(username)
-        client = paramiko.SSHClient()
-        self._apply_host_key_policy(client)
-        transport_attr = "_transport"
-        setattr(client, transport_attr, transport)
-        self._client = client
+            transport.auth_none(username)
+            client = paramiko.SSHClient()
+            self._apply_host_key_policy(client)
+            transport_attr = "_transport"
+            setattr(client, transport_attr, transport)
+            self._client = client
+        finally:
+            if self._client is None:
+                if client is not None:
+                    client.close()
+                if transport is not None:
+                    transport.close()
+                sock.close()
         _logger.debug("SSH connected to %s:%s as %s (auth=none)", hostname, port, username)
 
     def get_platform(self) -> str:
