@@ -22,12 +22,12 @@ def _script(monkeypatch: pytest.MonkeyPatch, responses: list[tuple[int, str, str
         body: bytes | None,
         headers: dict[str, str],
         _timeout: float,
-    ) -> tuple[int, str, str | None]:
+    ) -> tuple[int, str, str | None, list[tuple[str, str]]]:
         calls.append(
             {"method": method, "url": url, "body": body, "headers": dict(headers)},
         )
         status, text, location = responses[len(calls) - 1]
-        return status, text, location
+        return status, text, location, []
 
     monkeypatch.setattr(HttpClientWrapper, "_exchange", _exchange)
     return calls
@@ -44,7 +44,7 @@ def test_same_origin_307_keeps_body_and_credentials(monkeypatch: pytest.MonkeyPa
         data=b"secret-body",
         headers={"Authorization": "Bearer bench-token", "Cookie": "sid=1", "X-Run": "keep"},
     )
-    assert result == {"status_code": 200, "body": "ok"}
+    assert result == {"status_code": 200, "body": "ok", "headers": {}}
     forwarded = calls[1]
     assert forwarded["method"] == "POST"
     assert forwarded["url"] == "https://bench.invalid/next"

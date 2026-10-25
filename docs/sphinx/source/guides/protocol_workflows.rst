@@ -80,6 +80,60 @@ guarantee for a broker or a ZMQ pair. Arrange subscriber readiness in your
 service fixture before the publish under test. A Redis missing key returns
 ``None``; a receive timeout is an error rather than a fabricated message.
 
+Continuous pub/sub
+------------------
+
+``listen`` leaves a subscriber thread running. Each message it takes off the
+socket is a ``messaging`` measurement, command ``zmq.listen``, ``mqtt.listen``,
+or ``redis.listen``, with value ``{"topic", "payload"}``. ``fail_pattern``
+sets that row to ``FAIL`` when the payload matches and ``PASS`` otherwise.
+``stop_listen`` joins the thread and drains the write queue. ``verify_listen``
+reads those rows: ``max_silence_s`` is the longest gap between stored
+timestamps after the first message, and ``min_received`` requires that many
+device rows. One-shot ``send`` / ``receive`` / ``verify_payload_match`` remain
+the calls for a single message.
+
+ZMQ PUB and SUB are different configured ids. The listen thread owns the SUB
+socket, and the send thread owns the PUB socket::
+
+   col.messaging.zmq.listen(
+       zmq_id=2, key="status", fail_pattern=r"\b(ERR|FAULT|offline)\b",
+   )
+   # stimulate the unit while the listen thread records each broadcast
+   col.messaging.zmq.stop_listen(zmq_id=2, key="status")
+   col.messaging.zmq.verify_listen(key="status", max_silence_s=0.5, min_received=1)
+
+   col.messaging.zmq.start_sender(zmq_id=1)
+   col.messaging.zmq.enqueue(zmq_id=1, payload="arm", topic="cmd")
+   col.messaging.zmq.stop_sender(zmq_id=1)
+
+MQTT and Redis use the same listen, stop, and verify shape. MQTT ``publish``
+and Redis ``publish`` stay callable from the test thread while ``listen`` is
+running. ``start_sender`` is the queued path::
+
+   col.messaging.mqtt.listen(
+       mqtt_id=1, key="status", topic="device/#",
+       fail_pattern=r"\b(ERR|FAULT|offline)\b",
+   )
+   col.messaging.mqtt.stop_listen(mqtt_id=1, key="status")
+   col.messaging.mqtt.verify_listen(key="status", max_silence_s=0.5, min_received=1)
+
+   col.messaging.redis.listen(
+       redis_id=1, channel="events", key="status",
+       fail_pattern=r"\b(ERR|FAULT|offline)\b",
+   )
+   col.messaging.redis.stop_listen(redis_id=1, key="status")
+   col.messaging.redis.verify_listen(key="status", min_received=1)
+
+``MessagePump`` is that same loop for a poll callable the wrappers do not
+cover. It does not write the database; pass an ``on_message`` that does::
+
+   from colosseum_messaging._pump import MessagePump
+
+   pump = MessagePump(poll=my_poll, on_message=my_handler, name="custom-listen")
+   pump.start()
+   pump.stop()
+
 SSH connection and execution
 ----------------------------
 
