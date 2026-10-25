@@ -6,10 +6,13 @@ from typing import TYPE_CHECKING
 from colosseum.logging import get_logger
 
 import zmq
+from colosseum_messaging._pump import PumpHandle, topic_payload
 from colosseum_messaging.sim import SIM_MAILBOX
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from colosseum_messaging._pump import Hook
 
 _logger = get_logger("colosseum.messaging.zmq")
 _ALLOWED_DRIVERS = frozenset({"sim", "zmq"})
@@ -41,6 +44,8 @@ class ZmqClientWrapper:
         self._sim = driver == "sim"
         self._context: zmq.Context[zmq.Socket[bytes]] | None = None
         self._socket: zmq.Socket[bytes] | None = None
+        self._listen_pump = PumpHandle()
+        self._send_pump = PumpHandle()
         if self._sim:
             _logger.debug(
                 "ZMQ client sim mode endpoint=%s socket=%s", self._endpoint, self._socket_kind,
@@ -58,6 +63,11 @@ class ZmqClientWrapper:
             self._socket.connect(self._endpoint)
 
     def send(self, payload: str, topic: str = "") -> None:
+        if self._pump_owns_socket():
+            raise RuntimeError("ZMQ pump owns this socket")
+        self._send(payload, topic)
+
+    def _send(self, payload: str, topic: str = "") -> None:
         if self._socket_kind != "pub":
             raise RuntimeError("ZMQ send requires socket='pub'")
         topic_s = topic if topic else self._topic
@@ -73,6 +83,11 @@ class ZmqClientWrapper:
             self._socket.send_string(payload)
 
     def receive(self, timeout: float = 1.0) -> dict[str, str]:
+        if self._pump_owns_socket():
+            raise RuntimeError("ZMQ pump owns this socket")
+        return self._receive(timeout)
+
+    def _receive(self, timeout: float = 1.0) -> dict[str, str]:
         if self._socket_kind != "sub":
             raise RuntimeError("ZMQ receive requires socket='sub'")
         _logger.debug("ZMQ RECEIVE endpoint=%s timeout=%ss", self._endpoint, timeout)
@@ -107,7 +122,39 @@ class ZmqClientWrapper:
             payload = frames[0].decode("utf-8", errors="replace") if frames else ""
         return {"topic": topic, "payload": payload}
 
+    def start_listen(self, on_message: Hook) -> None:
+        if self._socket_kind != "sub":
+            raise RuntimeError("ZMQ listen requires socket='sub'")
+
+        def poll(timeout: float) -> dict[str, str] | None:
+            return self._receive(timeout)
+
+        self._listen_pump.start(poll=poll, on_message=on_message, name="zmq-listen")
+
+    def stop_listen(self) -> None:
+        self._listen_pump.stop()
+
+    def start_sender(self) -> None:
+        if self._socket_kind != "pub":
+            raise RuntimeError("ZMQ sender requires socket='pub'")
+        self._send_pump.start(offer=self._offer_send, name="zmq-send")
+
+    def enqueue(self, payload: str, topic: str = "") -> None:
+        self._send_pump.submit((topic, payload))
+
+    def stop_sender(self) -> None:
+        self._send_pump.stop()
+
+    def _offer_send(self, item: object) -> None:
+        topic, payload = topic_payload(item)
+        self._send(payload, topic)
+
+    def _pump_owns_socket(self) -> bool:
+        return self._listen_pump.running() or self._send_pump.running()
+
     def close(self) -> None:
+        self.stop_listen()
+        self.stop_sender()
         if self._socket is not None:
             try:
                 self._socket.close(linger=0)

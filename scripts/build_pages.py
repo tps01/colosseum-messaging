@@ -37,6 +37,10 @@ GUIDES: tuple[str, ...] = (
     "docs/sphinx/source/guides/getting_started.rst",
     "docs/sphinx/source/guides/protocol_workflows.rst",
 )
+CONFIG_REFERENCE: tuple[str, ...] = (
+    "docs/sphinx/source/config_reference.rst",
+)
+CONFIG_PACKAGE = "colosseum_messaging"
 # --- end per-plugin constants ---
 
 HUB_URL = "https://tps01.github.io/colosseum-core/"
@@ -160,7 +164,11 @@ def _write_function_page(stem: str, target: str, col_path: str) -> str:
     return f"api/{stem}"
 
 
-def _write_index(api_docs: list[str], guide_names: list[str]) -> None:
+def _write_index(
+    api_docs: list[str],
+    guide_names: list[str],
+    config_names: list[str],
+) -> None:
     lines = [
         TITLE,
         "=" * len(TITLE),
@@ -186,6 +194,17 @@ def _write_index(api_docs: list[str], guide_names: list[str]) -> None:
             "   readme",
         ],
     )
+    if config_names:
+        lines.append("")
+        lines.extend(
+            [
+                ".. toctree::",
+                "   :maxdepth: 2",
+                "   :caption: Config reference",
+                "",
+            ],
+        )
+        lines.extend(f"   {name}" for name in config_names)
     if guide_names:
         lines.append("")
         lines.extend(
@@ -219,6 +238,52 @@ def _copy_branding() -> None:
             shutil.copy2(src, static / name)
 
 
+def _config_reference_text() -> str:
+    chunks: list[str] = []
+    for rel in CONFIG_REFERENCE:
+        path = REPO_ROOT / rel
+        if not path.is_file():
+            raise SystemExit(f"Missing config reference: {path}")
+        chunks.append(path.read_text(encoding="utf-8"))
+    return "\n".join(chunks)
+
+
+def _check_config_reference() -> None:
+    """Fail when a registered id field or key is absent from the config RST."""
+    import importlib
+    import re
+
+    from colosseum.plugins.registry import PluginRegistry
+
+    package = importlib.import_module(CONFIG_PACKAGE)
+    registry = PluginRegistry()
+    package.register(registry)
+    text = _config_reference_text()
+    missing: list[str] = []
+    for spec in registry.config_section_specs():
+        names = (spec.id_field, *spec.required_keys, *spec.optional_keys)
+        for key in names:
+            if re.search(rf"(?<![\w]){re.escape(key)}(?![\w])", text) is None:
+                missing.append(f"{spec.dotted_path}.{key}")
+    if missing:
+        raise SystemExit(
+            "Config reference missing registered keys: " + ", ".join(missing),
+        )
+
+
+def _stage_config_reference() -> list[str]:
+    names: list[str] = []
+    for rel in CONFIG_REFERENCE:
+        src = REPO_ROOT / rel
+        name = src.stem
+        names.append(name)
+        (SITE_SOURCE / f"{name}.rst").write_text(
+            src.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+    return names
+
+
 def stage() -> None:
     # Fail when a root API export has no reference/navigation entry.
     api_source = REPO_ROOT / "colosseum_messaging" / "api" / "__init__.py"
@@ -236,6 +301,7 @@ def stage() -> None:
     missing = set(exported) - documented
     if missing:
         raise SystemExit(f"Public API missing from Pages inventory: {sorted(missing)}")
+    _check_config_reference()
     if SITE_SOURCE.exists():
         shutil.rmtree(SITE_SOURCE)
     SITE_SOURCE.mkdir(parents=True)
@@ -263,7 +329,8 @@ def stage() -> None:
         (guides_dir / f"{name}.rst").write_text(text, encoding="utf-8")
 
     _write_conf(_read_version())
-    _write_index(api_docs, guide_names)
+    config_names = _stage_config_reference()
+    _write_index(api_docs, guide_names, config_names)
 
 
 def build_html() -> Path:

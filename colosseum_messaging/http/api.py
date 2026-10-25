@@ -70,7 +70,7 @@ def request(
     :param headers: Optional request headers.
     :param timeout: Optional per-request timeout override in seconds.
 
-    :returns: ``{"status_code": int, "body": str}``.
+    :returns: ``{"status_code": int, "body": str, "headers": dict}``.
     """
     return _request(
         http_id=http_id,
