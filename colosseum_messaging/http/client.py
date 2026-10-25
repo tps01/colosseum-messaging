@@ -32,6 +32,7 @@ class HttpClientWrapper:
                 f"messaging.http driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
             )
         self._sim = driver == "sim"
+        self._cookies: dict[tuple[str, str, int], dict[str, str]] = {}
         if self._sim:
             _logger.debug("HTTP client sim mode enabled base_url=%s", self._base_url)
 
@@ -61,11 +62,13 @@ class HttpClientWrapper:
             return self._sim_request(method_u, path, body=body)
 
         redirects = 0
+        req_headers = self._with_cookies(url, req_headers)
         try:
             while True:
-                status_code, text, location = self._exchange(
+                status_code, text, location, header_pairs = self._exchange(
                     method_u, url, body, req_headers, req_timeout,
                 )
+                self._store_cookies(url, header_pairs)
                 if (
                     status_code in _REDIRECT_STATUSES
                     and location
@@ -91,6 +94,7 @@ class HttpClientWrapper:
                             body = None
                             req_headers = _headers_without(req_headers, _BODY_HEADERS)
                     url = next_url
+                    req_headers = self._with_cookies(url, req_headers)
                     continue
                 break
         except (HTTPException, TimeoutError, OSError, ValueError) as exc:
@@ -98,7 +102,11 @@ class HttpClientWrapper:
 
         preview = text[:200] + ("..." if len(text) > 200 else "")
         _logger.debug("HTTP status=%s body=%r", status_code, preview)
-        return {"status_code": status_code, "body": text}
+        return {
+            "status_code": status_code,
+            "body": text,
+            "headers": _header_map(header_pairs),
+        }
 
     def _exchange(
         self,
@@ -107,7 +115,7 @@ class HttpClientWrapper:
         body: bytes | None,
         headers: Mapping[str, str],
         timeout: float,
-    ) -> tuple[int, str, str | None]:
+    ) -> tuple[int, str, str | None, list[tuple[str, str]]]:
         parsed = _require_http_url(url)
         hostname = parsed.hostname or ""
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -130,16 +138,51 @@ class HttpClientWrapper:
             raw = response.read()
             status = int(response.status)
             location = response.getheader("Location")
+            header_pairs = [(str(name), str(value)) for name, value in response.getheaders()]
         finally:
             connection.close()
-        return status, raw.decode("utf-8", errors="replace"), location
+        return status, raw.decode("utf-8", errors="replace"), location, header_pairs
+
+    def _with_cookies(self, url: str, headers: Mapping[str, str]) -> dict[str, str]:
+        jar = self._cookies.get(_origin(url), {})
+        merged: dict[str, str] = {}
+        existing = ""
+        for name, value in headers.items():
+            if name.lower() == "cookie":
+                existing = value
+        if existing:
+            for part in existing.split(";"):
+                if "=" not in part:
+                    continue
+                name, value = part.split("=", 1)
+                token = name.strip()
+                if token:
+                    merged[token] = value.strip()
+        merged.update(jar)
+        out = {name: value for name, value in headers.items() if name.lower() != "cookie"}
+        if merged:
+            out["Cookie"] = "; ".join(f"{name}={value}" for name, value in merged.items())
+        return out
+
+    def _store_cookies(self, url: str, header_pairs: list[tuple[str, str]]) -> None:
+        jar = self._cookies.setdefault(_origin(url), {})
+        for name, value in header_pairs:
+            if name.lower() != "set-cookie":
+                continue
+            pair = value.split(";", 1)[0]
+            if "=" not in pair:
+                continue
+            cookie_name, cookie_value = pair.split("=", 1)
+            token = cookie_name.strip()
+            if token:
+                jar[token] = cookie_value.strip()
 
     def _sim_request(self, method: str, path: str, *, body: bytes | None) -> dict[str, object]:
         payload = "" if body is None else body.decode("utf-8", errors="replace")
         body_text = f"{method} {path}"
         if payload:
             body_text = f"{body_text} {payload}"
-        return {"status_code": 200, "body": body_text}
+        return {"status_code": 200, "body": body_text, "headers": {}}
 
     def close(self) -> None:
         return
@@ -160,6 +203,10 @@ def _origin(url: str) -> tuple[str, str, int]:
 
 def _headers_without(headers: Mapping[str, str], names: frozenset[str]) -> dict[str, str]:
     return {name: value for name, value in headers.items() if name.lower() not in names}
+
+
+def _header_map(pairs: list[tuple[str, str]]) -> dict[str, str]:
+    return dict(pairs)
 
 
 def _require_http_url(url: str) -> SplitResult:
