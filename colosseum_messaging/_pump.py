@@ -5,6 +5,7 @@ from __future__ import annotations
 import queue
 import threading
 from collections.abc import Callable
+from typing import Optional
 
 from colosseum.logging import get_logger
 
@@ -15,7 +16,7 @@ _POLL_TIMEOUT_S = 0.2
 _STOP_TIMEOUT_S = 2.0
 _OUTBOX_SIZE = 256
 
-Poll = Callable[[float], dict[str, str] | None]
+Poll = Callable[[float], Optional[dict[str, str]]]
 Offer = Callable[[object], None]
 Hook = Callable[[dict[str, str]], None]
 
