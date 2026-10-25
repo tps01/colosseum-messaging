@@ -38,6 +38,8 @@ def exec(  # noqa: A001
 ) -> dict[str, object]:
     """Run a remote command and record exit code plus stdout/stderr.
 
+    :param timeout: Command timeout. A number is seconds; a string may use
+        duration suffixes (``61s``, ``500ms``, ``1m``).
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Applies only when opening a connection, never to command execution.
     """
