@@ -93,7 +93,20 @@ def get(
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> dict[str, object]:
-    """HTTP GET; see :func:`request`."""
+    """HTTP GET; see :func:`request`.
+
+    :param http_id: Integer ID from the configured messaging.http row. Select an existing ID in
+        that section.
+    :param path: Request path relative to the configured base_url, including any query string.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param headers: Per-request HTTP header mapping; None uses no additional headers.
+    :param timeout: Per-request network timeout in seconds; None uses the configured timeout.
+        This does not wait for a business operation to finish.
+
+    :returns: Response dictionary with integer status_code and decoded text body; error HTTP
+        statuses are still recorded responses.
+    """
     return _request(
         http_id=http_id,
         method="GET",
@@ -115,7 +128,24 @@ def post(
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> dict[str, object]:
-    """HTTP POST; see :func:`request`."""
+    """HTTP POST; see :func:`request`.
+
+    :param http_id: Integer ID from the configured messaging.http row. Select an existing ID in
+        that section.
+    :param path: Request path relative to the configured base_url, including any query string.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param json: JSON-serializable request body; mutually exclusive with data. None omits this
+        body.
+    :param data: Raw request body as bytes or text; mutually exclusive with json. None omits
+        this body.
+    :param headers: Per-request HTTP header mapping; None uses no additional headers.
+    :param timeout: Per-request network timeout in seconds; None uses the configured timeout.
+        This does not wait for a business operation to finish.
+
+    :returns: Response dictionary with integer status_code and decoded text body; error HTTP
+        statuses are still recorded responses.
+    """
     return _request(
         http_id=http_id,
         method="POST",
@@ -139,7 +169,24 @@ def put(
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> dict[str, object]:
-    """HTTP PUT; see :func:`request`."""
+    """HTTP PUT; see :func:`request`.
+
+    :param http_id: Integer ID from the configured messaging.http row. Select an existing ID in
+        that section.
+    :param path: Request path relative to the configured base_url, including any query string.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param json: JSON-serializable request body; mutually exclusive with data. None omits this
+        body.
+    :param data: Raw request body as bytes or text; mutually exclusive with json. None omits
+        this body.
+    :param headers: Per-request HTTP header mapping; None uses no additional headers.
+    :param timeout: Per-request network timeout in seconds; None uses the configured timeout.
+        This does not wait for a business operation to finish.
+
+    :returns: Response dictionary with integer status_code and decoded text body; error HTTP
+        statuses are still recorded responses.
+    """
     return _request(
         http_id=http_id,
         method="PUT",
@@ -161,7 +208,20 @@ def delete(
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> dict[str, object]:
-    """HTTP DELETE; see :func:`request`."""
+    """HTTP DELETE; see :func:`request`.
+
+    :param http_id: Integer ID from the configured messaging.http row. Select an existing ID in
+        that section.
+    :param path: Request path relative to the configured base_url, including any query string.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param headers: Per-request HTTP header mapping; None uses no additional headers.
+    :param timeout: Per-request network timeout in seconds; None uses the configured timeout.
+        This does not wait for a business operation to finish.
+
+    :returns: Response dictionary with integer status_code and decoded text body; error HTTP
+        statuses are still recorded responses.
+    """
     return _request(
         http_id=http_id,
         method="DELETE",
@@ -188,7 +248,18 @@ def verify_status(
     expected: int,
     optional: bool = False,
 ) -> VerificationResult:
-    """Verify a prior HTTP measurement has the expected status code."""
+    """Verify a prior HTTP measurement has the expected status code.
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param expected: Expected HTTP status code (for example 200).
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
+    """
     value = _lookup_http_measurement(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
@@ -217,7 +288,19 @@ def verify_body_match(
     pattern: str,
     optional: bool = False,
 ) -> VerificationResult:
-    """Verify a prior HTTP measurement body matches a regex."""
+    """Verify a prior HTTP measurement body matches a regex.
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param pattern: Regular expression searched in the recorded text; invalid expressions
+        produce an error.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
+    """
     value = _lookup_http_measurement(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)

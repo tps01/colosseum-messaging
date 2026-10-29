@@ -60,14 +60,11 @@ col.messaging.scp.get(ssh_id=1, remote="/etc/network/interfaces", local="iface_s
 col.endex()
 ```
 
-## Expected artifacts
+## Results
 
-Normal CLI runs write `summary.json`, `summary.txt`, `execution.sqlite`, and
-`debug.log` under the run output directory. Reports are opt-in: add
-`--report wats` to the run command to write `wats_<datetime>_<script>.json`,
-or `--report junit` for `junit.xml`. Loading `metadata.yaml` enriches an
-enabled report; it does not enable reporting. See the
-[core reporting guide](https://tps01.github.io/colosseum-core/guides/output_artifacts.html).
+The plugin uses Colosseum's standard run artifacts. See the
+[core output guide](https://tps01.github.io/colosseum-core/guides/output_artifacts.html)
+for summaries, evidence queries, and opt-in reports.
 
 ## Develop
 

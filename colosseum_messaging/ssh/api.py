@@ -42,6 +42,18 @@ def exec(  # noqa: A001
         duration suffixes (``61s``, ``500ms``, ``1m``).
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Applies only when opening a connection, never to command execution.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param command: Remote shell command to execute; syntax follows the configured remote
+        platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param input: Optional input bytes or text sent to the remote command's stdin.
+    :param get_pty: Request a remote pseudo-terminal when true; defaults to false.
+
+    :returns: Dictionary with exit_code, stdout, and stderr. A nonzero exit code requires an
+        explicit verify_exit check.
     """
     _ = key
     return get_ssh_client(ssh_id, retries=retries).exec(
@@ -60,6 +72,17 @@ def measure_stdout(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param command: Remote shell command to execute; syntax follows the configured remote
+        platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param timeout: Command execution or collection timeout in seconds, independent of the
+        connection timeout in TOML. Default: ``30.0``.
+
+    :returns: Stripped remote stdout text, recorded as measurement evidence.
     """
     _ = key
     return get_ssh_client(ssh_id, retries=retries).exec_stdout(command, timeout=timeout)
@@ -80,6 +103,21 @@ def exec_sequence(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param path: Local script file, mutually exclusive with script; relative paths use the
+        working directory.
+    :param script: Inline script text, mutually exclusive with path.
+    :param interpreter: Explicit remote interpreter. A {remote} placeholder selects upload-and-
+        execute; otherwise script text is sent over stdin.
+    :param timeout: Command execution or collection timeout in seconds, independent of the
+        connection timeout in TOML. Default: ``30.0``.
+
+    :returns: Dictionary with exit_code, stdout, and stderr. A nonzero exit code requires an
+        explicit verify_exit check.
     """
     _ = key
     return get_ssh_client(ssh_id, retries=retries).exec_sequence(
@@ -98,6 +136,21 @@ def start(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param command: Remote shell command to execute; syntax follows the configured remote
+        platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param timeout: Command execution or collection timeout in seconds, independent of the
+        connection timeout in TOML. Default: ``30.0``.
+
+    :returns: None; the command outcome is recorded.
+
+
+    Pair with collect using the same ssh_id and key, then verify_exit.
+    See the SSH workflow guide for timeouts and output-file lifetime.
     """
     _ = key
     get_ssh_client(ssh_id, retries=retries).start(command, key, timeout=timeout)
@@ -111,6 +164,16 @@ def collect(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param timeout: Command execution or collection timeout in seconds, independent of the
+        connection timeout in TOML. Default: ``30.0``.
+
+    :returns: Dictionary with exit_code, stdout, and stderr. A nonzero exit code requires an
+        explicit verify_exit check.
     """
     _ = key
     return get_ssh_client(ssh_id, retries=retries).collect(key, timeout=timeout)
@@ -131,6 +194,18 @@ def put(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param local: Existing local source file/path pattern; resolved from the working directory.
+    :param remote: Remote source path/glob for get, or destination path for put; follows the
+        configured remote platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide. Default: ``''``.
+    :param recursive: Include directory descendants when true; defaults to false.
+    :param max_depth: Maximum recursive descent depth; None leaves depth unbounded.
+
+    :returns: None; the command outcome is recorded.
     """
     _ = key
     get_ssh_client(ssh_id, retries=retries).sftp_put(
@@ -155,6 +230,23 @@ def get(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param remote: Remote source path/glob for get, or destination path for put; follows the
+        configured remote platform.
+    :param local: Local download destination under the active run output directory unless
+        absolute; requires artifacts enabled.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param recursive: Include directory descendants when true; defaults to false.
+    :param max_depth: Maximum recursive descent depth; None leaves depth unbounded.
+    :param newest: Select this many newest matching files by modification time; None disables
+        selection. Mutually exclusive with oldest.
+    :param oldest: Select this many oldest matching files by modification time; None disables
+        selection. Mutually exclusive with newest.
+
+    :returns: List of saved local download paths, recorded as measurement evidence.
     """
     _ = key
     return get_ssh_client(ssh_id, retries=retries).sftp_get(
@@ -173,6 +265,14 @@ def listdir(*, ssh_id: int, path: str, key: str, retries: int = 3) -> list[str]:
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param path: Remote file or directory path, interpreted for the configured remote platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+
+    :returns: Returned value described above, recorded as evidence for decorated measurements.
     """
     _ = key
     return get_ssh_client(ssh_id, retries=retries).sftp_listdir(path)
@@ -184,6 +284,14 @@ def mkdir(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param path: Remote file or directory path, interpreted for the configured remote platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide. Default: ``''``.
+
+    :returns: None; the command outcome is recorded.
     """
     _ = key
     get_ssh_client(ssh_id, retries=retries).sftp_mkdir(path)
@@ -195,6 +303,14 @@ def remove(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param path: Remote file or directory path, interpreted for the configured remote platform.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide. Default: ``''``.
+
+    :returns: None; the command outcome is recorded.
     """
     _ = key
     get_ssh_client(ssh_id, retries=retries).sftp_remove(path)
@@ -208,6 +324,15 @@ def rename(
 
     :param retries: Total connection attempts (default 3); 0 disables retries.
         Cached connections are reused; operations are never replayed.
+
+    :param ssh_id: Integer ID from the configured messaging.ssh row. Select an existing ID in
+        that section.
+    :param old: Existing remote path to rename.
+    :param new: Destination remote path for the rename.
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide. Default: ``''``.
+
+    :returns: None; the command outcome is recorded.
     """
     _ = key
     get_ssh_client(ssh_id, retries=retries).sftp_rename(old, new)
@@ -224,7 +349,18 @@ def _lookup_ssh_measurement(key: str, commands: tuple[str, ...]) -> object | Non
 
 @verification
 def verify_exit(*, key: str, expected: int = 0, optional: bool = False) -> VerificationResult:
-    """Verify a prior SSH exec measurement has the expected exit code."""
+    """Verify a prior SSH exec measurement has the expected exit code.
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param expected: Expected remote exit code; zero normally denotes success. Default: ``0``.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
+    """
     value = _lookup_ssh_measurement(key, _SSH_EXEC_COMMANDS)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
@@ -253,7 +389,19 @@ def verify_stdout_match(
     pattern: str,
     optional: bool = False,
 ) -> VerificationResult:
-    """Verify prior SSH stdout (exec dict or ``measure_stdout`` string) matches a regex."""
+    """Verify prior SSH stdout (exec dict or ``measure_stdout`` string) matches a regex.
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param pattern: Regular expression searched in the recorded text; invalid expressions
+        produce an error.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
+    """
     value = _lookup_ssh_measurement(key, _SSH_STDOUT_COMMANDS)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
