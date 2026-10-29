@@ -145,16 +145,29 @@ def _document_controls(app, what, name, obj, options, lines):
         return
     documented = "\\n".join(lines)
     controls = {{
-        "optional": "False by default. True excludes unsuccessful outcomes from the aggregate result; commands and measurements also suppress operation exceptions. A failed optional measurement returns None.",
-        "description": "Verification label in summaries and reports; omitted or blank uses the evidence key.",
+        "optional": (
+            "False by default. True excludes unsuccessful outcomes from the "
+            "aggregate result; commands and measurements also suppress "
+            "operation exceptions. A failed optional measurement returns None."
+        ),
+        "description": (
+            "Verification label in summaries and reports; omitted or blank "
+            "uses the evidence key."
+        ),
     }}
     for parameter, description in controls.items():
-        if parameter in inspect.signature(obj).parameters and f":param {{parameter}}:" not in documented:
+        if (
+            parameter in inspect.signature(obj).parameters
+            and f":param {{parameter}}:" not in documented
+        ):
             lines.extend(["", f":param {{parameter}}: {{description}}"])
     documented = "\\n".join(lines)
-    missing = [parameter for parameter in inspect.signature(obj).parameters
-               if parameter not in ("args", "kwargs")
-               and f":param {{parameter}}:" not in documented]
+    missing = [
+        parameter
+        for parameter in inspect.signature(obj).parameters
+        if parameter not in ("args", "kwargs")
+        and f":param {{parameter}}:" not in documented
+    ]
     if missing:
         raise ValueError(f"{{name}} has undocumented parameters: {{', '.join(missing)}}")
 
@@ -206,13 +219,25 @@ def _write_index(
 ) -> None:
     lines = [
         TITLE, "=" * len(TITLE), "",
-        'Send HTTP requests, exchange Redis/ZMQ/MQTT messages, execute SSH commands, and transfer files with ``col.messaging.*``.', "",
+        (
+            "Send HTTP requests, exchange Redis/ZMQ/MQTT messages, execute "
+            "SSH commands, and transfer files with ``col.messaging.*``."
+        ),
+        "",
         f"`Colosseum core documentation hub <{HUB_URL}>`__", "",
     ]
-    development = [name for name in guide_names if name.endswith(("/development", "/driver-documentation-requests"))]
+    development = [
+        name
+        for name in guide_names
+        if name.endswith(("/development", "/driver-documentation-requests"))
+    ]
     learning = [name for name in guide_names if name not in development]
-    learning.sort(key=lambda name: (not name.endswith("/getting_started"),
-                                    name.endswith("/api_conventions")))
+    learning.sort(
+        key=lambda name: (
+            not name.endswith("/getting_started"),
+            name.endswith("/api_conventions"),
+        ),
+    )
     sections = (
         ("Overview", ["readme"]),
         ("Getting started and workflows", learning),
