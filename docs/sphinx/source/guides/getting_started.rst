@@ -7,7 +7,7 @@ Install the ``colosseum-messaging`` wheel into the same virtual environment as
 1. Config
 ---------
 
-Sim fragment (see ``examples/configs/config.messaging.sim.toml`` for all
+Save **config.messaging.sim.toml** beside your script (see ``examples/configs/config.messaging.sim.toml`` for all
 transports)::
 
    [messaging.http]
@@ -28,7 +28,7 @@ Common keys (from each section's ``ConfigSectionSpec``): integer ``*_id``,
 2. Procedure + verification
 ---------------------------
 
-HTTP::
+Save **msg_smoke.py** with this HTTP procedure::
 
    import colosseum as col
 
@@ -36,7 +36,7 @@ HTTP::
        col.messaging.http.get(http_id=1, path="/health", key="health")
        col.messaging.http.verify_status(key="health", expected=200)
 
-SSH::
+For SSH, add these calls inside the same ``main()``::
 
    col.messaging.ssh.measure_stdout(ssh_id=1, command="uname -a", key="uname")
    col.messaging.ssh.verify_stdout_match(key="uname", pattern=r".+")
@@ -51,3 +51,8 @@ SSH::
    colosseum run msg_smoke.py -g config.messaging.sim.toml
 
 Framework docs: `core hub <https://tps01.github.io/colosseum-core/>`__.
+
+Expected: exit 0 with a PASS HTTP status check. Adding the SSH calls records
+stdout and execution-result measurements and their checks. These are simulated
+responses, not live authentication or network tests. See :doc:`http`,
+:doc:`pubsub`, :doc:`ssh`, and :doc:`transfers` for live workflows.

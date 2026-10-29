@@ -83,7 +83,19 @@ def verify_value_match(
     pattern: str,
     optional: bool = False,
 ) -> VerificationResult:
-    """Verify a prior Redis ``get`` measurement matches a regex."""
+    """Verify a prior Redis ``get`` measurement matches a regex.
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param pattern: Regular expression searched in the recorded text; invalid expressions
+        produce an error.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
+    """
     row = get_context().db.get_measurement("messaging", "redis.get", key, row_index=0)
     actual = None if row is None or row.value is None else str(row.value)
     if actual is None:
@@ -175,6 +187,20 @@ def verify_listen(
     Example::
 
         col.messaging.redis.verify_listen(key="status", min_received=1)
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param max_matched: Maximum number of listener rows matching fail_pattern; defaults to zero.
+    :param max_silence_s: Maximum gap in seconds between stored messages after the first; None
+        disables this check. Startup delay is excluded.
+    :param min_received: Minimum number of recorded messages; defaults to zero. Set at least one
+        when an empty capture must fail.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
     """
     return verify_recorded(
         command=_LISTEN_COMMAND,
