@@ -42,7 +42,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.9", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -113,8 +113,8 @@ jobs:
             Archives include `colosseum-core` plus third-party deps. Wheels are under
             `wheels/`; use the operator scripts at the archive root.
 
-            - Windows: `colosseum-messaging-offline-windows-py{3.9,3.12}.zip` → `install.bat`, then `start_cli.bat` / `start_gui.bat`
-            - Linux: `colosseum-messaging-offline-linux-py{3.9,3.12}.tar.gz` → `./install.sh`, then `./start_cli.sh` / `./start_gui.sh`
+            - Windows: `colosseum-messaging-offline-windows-py{3.9,3.12,3.14}.zip` → `install.bat`, then `start_cli.bat` / `start_gui.bat`
+            - Linux: `colosseum-messaging-offline-linux-py{3.9,3.12,3.14}.tar.gz` → `./install.sh`, then `./start_cli.sh` / `./start_gui.sh`
 
             ```bash
             tar -xzf colosseum-messaging-offline-linux-py<ver>.tar.gz -C wheelhouse
