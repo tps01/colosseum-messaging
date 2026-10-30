@@ -71,7 +71,19 @@ def verify_payload_match(
     pattern: str,
     optional: bool = False,
 ) -> VerificationResult:
-    """Verify a prior MQTT ``receive`` payload matches a regex."""
+    """Verify a prior MQTT ``receive`` payload matches a regex.
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param pattern: Regular expression searched in the recorded text; invalid expressions
+        produce an error.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
+    """
     value = _lookup_payload(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
@@ -169,6 +181,20 @@ def verify_listen(
         col.messaging.mqtt.verify_listen(
             key="status", max_silence_s=0.5, min_received=1,
         )
+
+    :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
+        evidence lookup rules in the core guide.
+    :param max_matched: Maximum number of listener rows matching fail_pattern; defaults to zero.
+    :param max_silence_s: Maximum gap in seconds between stored messages after the first; None
+        disables this check. Startup delay is excluded.
+    :param min_received: Minimum number of recorded messages; defaults to zero. Set at least one
+        when an empty capture must fail.
+    :param optional: When true, retain an unsuccessful outcome without failing the aggregate
+        result. Commands and measurements also suppress their operation exception; a failed
+        measurement returns None. Defaults to false.
+
+    :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
+        actual value when available.
     """
     return verify_recorded(
         command=_LISTEN_COMMAND,
