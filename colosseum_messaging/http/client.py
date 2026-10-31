@@ -88,6 +88,7 @@ class HttpClientWrapper:
                     if status_code in {301, 302, 303} and method_u not in {"GET", "HEAD"}:
                         method_u = "GET"
                         body = None
+                        req_headers = _headers_without(req_headers, _BODY_HEADERS)
                     if current_origin != next_origin:
                         req_headers = _headers_without(req_headers, _SENSITIVE_HEADERS)
                         if body is not None:
