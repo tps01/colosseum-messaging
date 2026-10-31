@@ -8,14 +8,15 @@ from colosseum.context import get_context
 from colosseum.logging import get_logger
 
 from colosseum_messaging._cache import cached_resource, close_cached_resources
-from colosseum_messaging.http.client import HttpClientWrapper
-from colosseum_messaging.mqtt.client import MqttClientWrapper
-from colosseum_messaging.redis.client import RedisClientWrapper
-from colosseum_messaging.ssh.client import SSHClientWrapper, _connection_attempts
-from colosseum_messaging.zmq.client import ZmqClientWrapper
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from colosseum_messaging.http.client import HttpClientWrapper
+    from colosseum_messaging.mqtt.client import MqttClientWrapper
+    from colosseum_messaging.redis.client import RedisClientWrapper
+    from colosseum_messaging.ssh.client import SSHClientWrapper
+    from colosseum_messaging.zmq.client import ZmqClientWrapper
 
 _logger = get_logger("colosseum.messaging")
 
@@ -62,6 +63,8 @@ def _cached_client(
 
 
 def get_http_client(http_id: int) -> HttpClientWrapper:
+    from colosseum_messaging.http.client import HttpClientWrapper
+
     return _cached_client(
         section="messaging.http",
         item_id=http_id,
@@ -73,6 +76,8 @@ def get_http_client(http_id: int) -> HttpClientWrapper:
 
 
 def get_redis_client(redis_id: int) -> RedisClientWrapper:
+    from colosseum_messaging.redis.client import RedisClientWrapper
+
     return _cached_client(
         section="messaging.redis",
         item_id=redis_id,
@@ -84,6 +89,8 @@ def get_redis_client(redis_id: int) -> RedisClientWrapper:
 
 
 def get_zmq_client(zmq_id: int) -> ZmqClientWrapper:
+    from colosseum_messaging.zmq.client import ZmqClientWrapper
+
     return _cached_client(
         section="messaging.zmq",
         item_id=zmq_id,
@@ -97,6 +104,8 @@ def get_zmq_client(zmq_id: int) -> ZmqClientWrapper:
 
 
 def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
+    from colosseum_messaging.mqtt.client import MqttClientWrapper
+
     return _cached_client(
         section="messaging.mqtt",
         item_id=mqtt_id,
@@ -108,6 +117,8 @@ def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
 
 
 def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
+    from colosseum_messaging.ssh.client import SSHClientWrapper, _connection_attempts
+
     _connection_attempts(retries)
     return _cached_client(
         section="messaging.ssh",
