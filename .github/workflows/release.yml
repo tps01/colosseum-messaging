@@ -41,26 +41,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
         python-version: ["3.9", "3.12"]
     steps:
       - uses: actions/checkout@v7
         with:
           path: colosseum-messaging
-      - uses: actions/checkout@v7
-        with:
-          repository: tps01/colosseum-core
-          ref: develop
-          path: colosseum-core
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - name: Resolve colosseum-core ref
+        working-directory: colosseum-messaging
+        shell: bash
+        run: echo "CORE_REF=$(python scripts/ci/resolve_core_ref.py)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+        with:
+          repository: tps01/colosseum-core
+          ref: ${{ env.CORE_REF }}
+          path: colosseum-core
       - name: Build offline wheelhouse archive
         working-directory: colosseum-messaging
         run: >
           python scripts/ci/build_offline_wheelhouse.py
           --also-build ../colosseum-core
+          --core-ref ${{ env.CORE_REF }}
           --archive
       - name: Upload offline wheelhouse
         uses: actions/upload-artifact@v7
@@ -112,13 +117,16 @@ jobs:
 
             Archives include `colosseum-core` plus third-party deps. Wheels are under
             `wheels/`; use the operator scripts at the archive root.
+            Pick the archive that matches your OS, **CPU arch**, and Python.
 
             - Windows: `colosseum-messaging-offline-windows-py{3.9,3.12}.zip` → `install.bat`, then `start_cli.bat` / `start_gui.bat`
-            - Linux: `colosseum-messaging-offline-linux-py{3.9,3.12}.tar.gz` → `./install.sh`, then `./start_cli.sh` / `./start_gui.sh`
+            - Linux x86_64: `colosseum-messaging-offline-linux-x86_64-py{3.9,3.12}.tar.gz` → `./install.sh`
+            - Linux aarch64: `colosseum-messaging-offline-linux-aarch64-py{3.9,3.12}.tar.gz` → `./install.sh`
 
             ```bash
-            tar -xzf colosseum-messaging-offline-linux-py<ver>.tar.gz -C wheelhouse
+            tar -xzf colosseum-messaging-offline-linux-aarch64-py<ver>.tar.gz -C wheelhouse
             cd wheelhouse && chmod +x install.sh start_*.sh && ./install.sh
             ```
+
           files: release-files/*
           fail_on_unmatched_files: true

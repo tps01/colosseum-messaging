@@ -55,15 +55,28 @@ def _read_project_name(pyproject: Path) -> str:
     return match.group(1)
 
 
+def _linux_cpu_arch() -> str:
+    """Normalize ``platform.machine()`` to an archive CPU token."""
+    machine = platform.machine().lower()
+    if machine in {"x86_64", "amd64"}:
+        return "x86_64"
+    if machine in {"aarch64", "arm64"}:
+        return "aarch64"
+    raise SystemExit(
+        f"Unsupported Linux machine={platform.machine()!r}; "
+        "expected x86_64/amd64 or aarch64/arm64",
+    )
+
+
 def _default_os_label() -> str:
     system = platform.system().lower()
     if system == "windows":
         return "windows"
     if system == "linux":
-        return "linux"
+        return f"linux-{_linux_cpu_arch()}"
     if system == "darwin":
         return "macos"
-    return system or "unknown"
+    raise SystemExit(f"Unsupported platform.system()={platform.system()!r}")
 
 
 def _python_tag(py: str) -> str:
@@ -76,9 +89,43 @@ def _python_tag(py: str) -> str:
 
 def _archive_format(os_label: str) -> str:
     """``shutil.make_archive`` format: zip on Windows, gztar elsewhere."""
-    if os_label == "windows":
+    if os_label == "windows" or os_label.startswith("windows-"):
         return "zip"
     return "gztar"
+
+
+def _expected_binary_arch(os_label: str) -> str | None:
+    """Return the CPU arch token binary wheels must match, or None if unscoped."""
+    if os_label.startswith("linux-"):
+        return os_label.removeprefix("linux-")
+    return None
+
+
+def _assert_wheel_arches(wheels_dir: Path, *, os_label: str) -> None:
+    """Fail if a platform wheel does not match the house CPU arch."""
+    expected = _expected_binary_arch(os_label)
+    if expected is None:
+        return
+    wrong: list[str] = []
+    for wheel in sorted(wheels_dir.glob("*.whl")):
+        name = wheel.name
+        # Pure wheels: ...-py3-none-any.whl / ...-py2.py3-none-any.whl
+        if "-none-any.whl" in name:
+            continue
+        has_expected = expected in name
+        has_x86 = "x86_64" in name or "amd64" in name
+        has_arm = "aarch64" in name or "arm64" in name
+        if expected == "x86_64" and has_arm and not has_expected:
+            wrong.append(name)
+        elif expected == "aarch64" and has_x86 and not has_expected:
+            wrong.append(name)
+        elif (has_x86 or has_arm) and not has_expected:
+            wrong.append(name)
+    if wrong:
+        preview = "\n  ".join(wrong[:20])
+        raise SystemExit(
+            f"Wheelhouse os_label={os_label} contains wrong-arch wheels:\n  {preview}",
+        )
 
 
 def _build_wheel(py: str, package_dir: Path, wheels_dir: Path) -> Path:
@@ -261,13 +308,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--os-label",
         default=None,
-        help="OS token in archive name (default: windows/linux/macos from platform)",
+        help=(
+            "OS token in archive name "
+            "(default: windows / linux-x86_64 / linux-aarch64 / macos)"
+        ),
     )
     parser.add_argument(
         "--archive-dir",
         type=Path,
         default=None,
         help="Directory for the archive (default: repo root)",
+    )
+    parser.add_argument(
+        "--core-ref",
+        default=None,
+        help="Optional colosseum-core git ref recorded in MANIFEST.txt (plugins)",
     )
     args = parser.parse_args(argv)
 
@@ -316,36 +371,38 @@ def main(argv: list[str] | None = None) -> int:
         *[str(p) for p in first_party],
     ]
     _run(download_cmd)
+    _assert_wheel_arches(wheels_dir, os_label=os_label)
 
     wheels = sorted(wheels_dir.glob("*.whl"))
-    manifest = wheelhouse / "MANIFEST.txt"
-    manifest.write_text(
-        "\n".join(
-            [
-                f"package={package_name}",
-                f"python={py_tag}",
-                f"os_label={os_label}",
-                f"created_utc={datetime.now(timezone.utc).isoformat()}",
-                f"platform={platform.platform()}",
-                f"machine={platform.machine()}",
-                f"wheel_count={len(wheels)}",
-                "",
-                "wheels:",
-                *[f"  wheels/{p.name}" for p in wheels],
-                "",
-                "first_party:",
-                *[f"  wheels/{p.name}" for p in first_party],
-                "",
-            ],
-        ),
-        encoding="utf-8",
+    manifest_lines = [
+        f"package={package_name}",
+        f"python={py_tag}",
+        f"os_label={os_label}",
+        f"created_utc={datetime.now(timezone.utc).isoformat()}",
+        f"platform={platform.platform()}",
+        f"machine={platform.machine()}",
+        f"wheel_count={len(wheels)}",
+    ]
+    if args.core_ref:
+        manifest_lines.append(f"core_ref={args.core_ref}")
+    manifest_lines.extend(
+        [
+            "",
+            "wheels:",
+            *[f"  wheels/{p.name}" for p in wheels],
+            "",
+            "first_party:",
+            *[f"  wheels/{p.name}" for p in first_party],
+            "",
+        ],
     )
+    (wheelhouse / "MANIFEST.txt").write_text("\n".join(manifest_lines), encoding="utf-8")
 
     _write_bundle_scripts(wheelhouse, unique_install)
 
     archive_note = (
         "Windows archive: .zip — extract, then run install.bat"
-        if os_label == "windows"
+        if os_label == "windows" or os_label.startswith("windows-")
         else "Linux/macOS archive: .tar.gz — extract, then run ./install.sh"
     )
     (wheelhouse / "INSTALL.txt").write_text(
@@ -353,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
             [
                 f"Offline install (Python {py_tag}, {os_label}):",
                 "",
-                "1. Extract this archive on a matching OS / Python minor.",
+                "1. Extract this archive on a matching OS / CPU arch / Python minor.",
                 "2. Create a venv and install from the nested wheels/ folder:",
                 "",
                 "   Windows:  install.bat",
@@ -372,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
                 "",
                 archive_note,
                 "",
+                "Linux archives are CPU-specific (linux-x86_64 vs linux-aarch64).",
                 "GUI (colosseum-core): tkinter must already be part of this Python.",
                 "Windows python.org builds usually include it.",
                 "Linux: bake python3-tk (or a Tk-enabled Python) into the host image.",
