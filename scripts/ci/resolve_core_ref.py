@@ -51,6 +51,10 @@ def _is_version_tag_ref(ref: str) -> bool:
 
 
 def _list_core_tags() -> list[str]:
+    env = os.environ.copy()
+    # actions/checkout auth uses GITHUB_TOKEN; gh CLI expects GH_TOKEN.
+    if not env.get("GH_TOKEN") and env.get("GITHUB_TOKEN"):
+        env["GH_TOKEN"] = env["GITHUB_TOKEN"]
     proc = subprocess.run(
         [
             "gh",
@@ -68,6 +72,7 @@ def _list_core_tags() -> list[str]:
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
     if proc.returncode != 0:
         raise SystemExit(
