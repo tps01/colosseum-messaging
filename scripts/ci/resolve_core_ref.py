@@ -17,15 +17,15 @@ import argparse
 import os
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 try:
     from packaging.specifiers import SpecifierSet
-    from packaging.version import Version
+    from packaging.version import InvalidVersion, Version
 except ImportError:  # pragma: no cover - packaging ships with pip
     SpecifierSet = None  # type: ignore[misc, assignment]
     Version = None  # type: ignore[misc, assignment]
+    InvalidVersion = Exception  # type: ignore[misc, assignment]
 
 
 def _repo_root() -> Path:
@@ -74,8 +74,7 @@ def _list_core_tags() -> list[str]:
             "gh release list failed for tps01/colosseum-core:\n"
             f"{proc.stderr.strip() or proc.stdout.strip()}",
         )
-    tags = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-    return tags
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
 
 def _newest_satisfying_tag(tags: list[str], specifier: str) -> str:
@@ -89,7 +88,7 @@ def _newest_satisfying_tag(tags: list[str], specifier: str) -> str:
         ver_text = tag[1:]
         try:
             ver = Version(ver_text)
-        except Exception:
+        except InvalidVersion:
             continue
         if ver in spec:
             candidates.append((ver, tag))

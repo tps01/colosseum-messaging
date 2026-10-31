@@ -112,14 +112,9 @@ def _assert_wheel_arches(wheels_dir: Path, *, os_label: str) -> None:
         # Pure wheels: ...-py3-none-any.whl / ...-py2.py3-none-any.whl
         if "-none-any.whl" in name:
             continue
-        has_expected = expected in name
         has_x86 = "x86_64" in name or "amd64" in name
         has_arm = "aarch64" in name or "arm64" in name
-        if expected == "x86_64" and has_arm and not has_expected:
-            wrong.append(name)
-        elif expected == "aarch64" and has_x86 and not has_expected:
-            wrong.append(name)
-        elif (has_x86 or has_arm) and not has_expected:
+        if (has_x86 or has_arm) and expected not in name:
             wrong.append(name)
     if wrong:
         preview = "\n  ".join(wrong[:20])
