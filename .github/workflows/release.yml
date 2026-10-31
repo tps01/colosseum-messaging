@@ -54,7 +54,12 @@ jobs:
       - name: Resolve colosseum-core ref
         working-directory: colosseum-messaging
         shell: bash
-        run: echo "CORE_REF=$(python scripts/ci/resolve_core_ref.py)" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CORE_REF=$(python scripts/ci/resolve_core_ref.py)
+          echo "CORE_REF=${CORE_REF}" >> "$GITHUB_ENV"
+          test -n "$CORE_REF"
       - uses: actions/checkout@v7
         with:
           repository: tps01/colosseum-core
