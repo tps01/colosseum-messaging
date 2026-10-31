@@ -57,6 +57,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          python -m pip install -q packaging
           CORE_REF=$(python scripts/ci/resolve_core_ref.py)
           echo "CORE_REF=${CORE_REF}" >> "$GITHUB_ENV"
           test -n "$CORE_REF"
