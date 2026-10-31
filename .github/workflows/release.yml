@@ -42,7 +42,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.9", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -119,9 +119,9 @@ jobs:
             `wheels/`; use the operator scripts at the archive root.
             Pick the archive that matches your OS, **CPU arch**, and Python.
 
-            - Windows: `colosseum-messaging-offline-windows-py{3.9,3.12}.zip` → `install.bat`, then `start_cli.bat` / `start_gui.bat`
-            - Linux x86_64: `colosseum-messaging-offline-linux-x86_64-py{3.9,3.12}.tar.gz` → `./install.sh`
-            - Linux aarch64: `colosseum-messaging-offline-linux-aarch64-py{3.9,3.12}.tar.gz` → `./install.sh`
+            - Windows: `colosseum-messaging-offline-windows-py{3.9,3.12,3.14}.zip` → `install.bat`, then `start_cli.bat` / `start_gui.bat`
+            - Linux x86_64: `colosseum-messaging-offline-linux-x86_64-py{3.9,3.12,3.14}.tar.gz` → `./install.sh`
+            - Linux aarch64: `colosseum-messaging-offline-linux-aarch64-py{3.9,3.12,3.14}.tar.gz` → `./install.sh`
 
             ```bash
             tar -xzf colosseum-messaging-offline-linux-aarch64-py<ver>.tar.gz -C wheelhouse
