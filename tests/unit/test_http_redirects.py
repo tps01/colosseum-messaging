@@ -63,8 +63,12 @@ def test_same_origin_302_becomes_get_without_body(monkeypatch: pytest.MonkeyPatc
     _client().request(
         "POST",
         "/start",
-        data=b"secret-body",
-        headers={"Authorization": "Bearer bench-token"},
+        data=b"abc",
+        headers={
+            "Authorization": "Bearer bench-token",
+            "Content-Length": "3",
+            "Transfer-Encoding": "chunked",
+        },
     )
     forwarded = calls[1]
     assert forwarded["method"] == "GET"
@@ -72,6 +76,36 @@ def test_same_origin_302_becomes_get_without_body(monkeypatch: pytest.MonkeyPatc
     headers = forwarded["headers"]
     assert isinstance(headers, dict)
     assert headers["Authorization"] == "Bearer bench-token"
+    assert "Content-Length" not in headers
+    assert "Transfer-Encoding" not in headers
+
+
+def test_cross_origin_302_strips_body_framing_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _script(
+        monkeypatch,
+        [(302, "", "https://other.invalid/receive"), (200, "ok", None)],
+    )
+    _client().request(
+        "POST",
+        "/start",
+        data=b"abc",
+        headers={
+            "Authorization": "Bearer bench-token",
+            "Content-Length": "3",
+            "Transfer-Encoding": "chunked",
+            "X-Run": "keep",
+        },
+    )
+    forwarded = calls[1]
+    assert forwarded["method"] == "GET"
+    assert forwarded["url"] == "https://other.invalid/receive"
+    assert forwarded["body"] is None
+    headers = forwarded["headers"]
+    assert isinstance(headers, dict)
+    assert "Authorization" not in headers
+    assert "Content-Length" not in headers
+    assert "Transfer-Encoding" not in headers
+    assert headers["X-Run"] == "keep"
 
 
 def test_cross_origin_307_strips_secrets_and_drops_body(monkeypatch: pytest.MonkeyPatch) -> None:
