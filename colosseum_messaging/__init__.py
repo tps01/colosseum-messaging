@@ -4,9 +4,8 @@ from importlib import metadata
 
 from colosseum.config.sections import ConfigSectionSpec
 from colosseum.logging import get_logger
+from colosseum.plugins.lazy import lazy_module
 from colosseum.plugins.registry import PluginRegistry
-
-from colosseum_messaging.connections import close_all
 
 __colosseum_domain__ = "messaging"
 
@@ -19,9 +18,9 @@ _logger = get_logger("colosseum.messaging")
 
 
 def register(registry: PluginRegistry) -> None:
-    from colosseum_messaging import api
+    from colosseum_messaging.connections import close_all
 
-    registry.register_namespace("messaging", api)
+    registry.register_namespace("messaging", lazy_module("colosseum_messaging.api"))
     _logger.debug("Registered col.messaging namespace")
     registry.register_shutdown(close_all)
     registry.register_config_section(
