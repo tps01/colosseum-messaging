@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from colosseum_messaging.mqtt.client import MqttClientWrapper, _topic_matches
 
 
@@ -16,22 +15,24 @@ def test_sim_publish_receive_roundtrip() -> None:
     assert msg == {"topic": "device/cmd", "payload": "on"}
 
 
-@pytest.mark.parametrize(
-    ("filter_topic", "message_topic", "expected"),
-    [
-        ("#", "$SYS/status", False),
-        ("+/status", "$SYS/status", False),
-        ("$SYS/#", "$SYS/status", True),
-        ("#", "device/cmd", True),
-        ("+/status", "device/status", True),
-    ],
-)
-def test_topic_matches_respects_reserved_dollar_topics(
-    filter_topic: str,
-    message_topic: str,
-    expected: bool,
-) -> None:
-    assert _topic_matches(filter_topic, message_topic) is expected
+def test_hash_does_not_match_reserved_dollar_topic() -> None:
+    assert _topic_matches("#", "$SYS/status") is False
+
+
+def test_plus_does_not_match_reserved_dollar_topic() -> None:
+    assert _topic_matches("+/status", "$SYS/status") is False
+
+
+def test_explicit_dollar_subscription_still_matches() -> None:
+    assert _topic_matches("$SYS/#", "$SYS/status") is True
+
+
+def test_hash_still_matches_normal_topic() -> None:
+    assert _topic_matches("#", "device/cmd") is True
+
+
+def test_plus_still_matches_normal_topic() -> None:
+    assert _topic_matches("+/status", "device/status") is True
 
 
 def test_sim_receive_skips_reserved_dollar_topics_for_hash() -> None:
