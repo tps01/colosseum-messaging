@@ -338,18 +338,31 @@ def rename(
     get_ssh_client(ssh_id, retries=retries).sftp_rename(old, new)
 
 
-def _lookup_ssh_measurement(key: str, commands: tuple[str, ...]) -> object | None:
+def _lookup_ssh_measurement(
+    key: str, commands: tuple[str, ...],
+) -> tuple[object | None, str | None]:
+    """Return ``(value, error)`` for a unique SSH measurement key among ``commands``."""
     ctx = get_context()
+    hits: list[object] = []
     for command_name in commands:
         row = ctx.db.get_measurement("messaging", command_name, key, row_index=0)
         if row is not None and row.value is not None:
-            return cast("object", row.value)
-    return None
+            hits.append(cast("object", row.value))
+    if not hits:
+        return None, None
+    if len(hits) > 1:
+        return None, (
+            f"ambiguous SSH measurement key {key!r}: "
+            "matches multiple commands; use a distinct key per call"
+        )
+    return hits[0], None
 
 
 @verification
 def verify_exit(*, key: str, expected: int = 0, optional: bool = False) -> VerificationResult:
     """Verify a prior SSH exec measurement has the expected exit code.
+
+    The ``key`` must match exactly one prior exec/sequence/collect measurement.
 
     :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
         evidence lookup rules in the core guide.
@@ -361,7 +374,9 @@ def verify_exit(*, key: str, expected: int = 0, optional: bool = False) -> Verif
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
-    value = _lookup_ssh_measurement(key, _SSH_EXEC_COMMANDS)
+    value, ambiguity = _lookup_ssh_measurement(key, _SSH_EXEC_COMMANDS)
+    if ambiguity is not None:
+        return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
     if not isinstance(value, dict) or "exit_code" not in value:
@@ -402,7 +417,9 @@ def verify_stdout_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
-    value = _lookup_ssh_measurement(key, _SSH_STDOUT_COMMANDS)
+    value, ambiguity = _lookup_ssh_measurement(key, _SSH_STDOUT_COMMANDS)
+    if ambiguity is not None:
+        return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
     stdout = str(value["stdout"]) if isinstance(value, dict) and "stdout" in value else str(value)
