@@ -5,6 +5,7 @@ from importlib.metadata import distribution
 import colosseum_messaging
 import paho.mqtt.client  # noqa: F401 - importability smoke for declared deps
 import paramiko  # noqa: F401
+
 import redis  # noqa: F401
 import scp  # noqa: F401
 import zmq  # noqa: F401
