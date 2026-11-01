@@ -172,17 +172,4 @@ class MqttClientWrapper:
 
 
 def _topic_matches(filter_topic: str, message_topic: str) -> bool:
-    if filter_topic in ("#", ""):
-        return True
-    filter_parts = filter_topic.split("/")
-    message_parts = message_topic.split("/")
-    for index, part in enumerate(filter_parts):
-        if part == "#":
-            return True
-        if index >= len(message_parts):
-            return False
-        if part == "+":
-            continue
-        if part != message_parts[index]:
-            return False
-    return len(filter_parts) == len(message_parts)
+    return mqtt.topic_matches_sub(filter_topic, message_topic)
