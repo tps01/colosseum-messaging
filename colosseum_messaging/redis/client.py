@@ -31,14 +31,17 @@ class RedisClientWrapper:
         self._subscribed_channel: str | None = None
         self._listen_pump = PumpHandle()
         self._send_pump = PumpHandle()
-        self._mailbox_prefix = f"redis:{config.get('host')}:{config.get('port', 6379)}"
+        # Pub/sub is server-wide (not DB-isolated); string KV is per-db.
+        self._db = int(str(config.get("db", 0)))
+        self._server_prefix = f"redis:{config.get('host')}:{config.get('port', 6379)}"
+        self._kv_prefix = f"{self._server_prefix}:{self._db}"
         if self._sim:
             _logger.debug("Redis client sim mode enabled")
             return
         kwargs: dict[str, object] = {
             "host": str(config["host"]),
             "port": int(str(config.get("port", 6379))),
-            "db": int(str(config.get("db", 0))),
+            "db": self._db,
             "socket_timeout": float(str(config.get("timeout", 10.0))),
             "decode_responses": True,
         }
@@ -53,7 +56,7 @@ class RedisClientWrapper:
     def set(self, name: str, value: str) -> None:
         _logger.debug("Redis SET %s", name)
         if self._sim:
-            sim_redis_set(self._mailbox_prefix, name, value)
+            sim_redis_set(self._kv_prefix, name, value)
             return
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
@@ -62,7 +65,7 @@ class RedisClientWrapper:
     def get(self, name: str) -> str | None:
         _logger.debug("Redis GET %s", name)
         if self._sim:
-            return sim_redis_get(self._mailbox_prefix, name)
+            return sim_redis_get(self._kv_prefix, name)
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
         value = self._client.get(name)
@@ -79,7 +82,7 @@ class RedisClientWrapper:
     def _publish(self, channel: str, message: str) -> None:
         _logger.debug("Redis PUBLISH %s", channel)
         if self._sim:
-            SIM_MAILBOX.publish(f"{self._mailbox_prefix}:{channel}", channel, message)
+            SIM_MAILBOX.publish(f"{self._server_prefix}:{channel}", channel, message)
             return
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
@@ -94,7 +97,7 @@ class RedisClientWrapper:
     def _receive(self, channel: str, timeout: float = 1.0) -> dict[str, str]:
         _logger.debug("Redis RECEIVE %s timeout=%ss", channel, timeout)
         if self._sim:
-            item = SIM_MAILBOX.receive(f"{self._mailbox_prefix}:{channel}", timeout)
+            item = SIM_MAILBOX.receive(f"{self._server_prefix}:{channel}", timeout)
             if item is None:
                 raise TimeoutError(f"No Redis message on channel {channel!r} within {timeout}s")
             topic, payload = item
