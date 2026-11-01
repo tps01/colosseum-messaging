@@ -17,12 +17,6 @@ dependencies = [
   "paho-mqtt>=2,<3",
   "paramiko>=3.0,<4",
   "scp>=0.14,<1",
-  "pytest>=8.0",
-  "bandit[toml]>=1.7",
-  "vulture>=2.11",
-  "ruff>=0.8",
-  "mypy>=1.11",
-  "types-paramiko",
 ]
 
 [project.entry-points."colosseum.plugins"]

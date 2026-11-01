@@ -1,0 +1,8 @@
+# Developer install: runtime (via editable package) plus test and static tools.
+-e .
+pytest>=8.0
+bandit[toml]>=1.7
+vulture>=2.11
+ruff>=0.8
+mypy>=1.11
+types-paramiko
