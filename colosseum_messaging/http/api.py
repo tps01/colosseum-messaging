@@ -232,13 +232,26 @@ def delete(
     )
 
 
-def _lookup_http_measurement(key: str) -> object | None:
+def _lookup_http_measurement(key: str) -> tuple[object | None, str | None]:
+    """Return ``(value, error)`` for a unique HTTP measurement key.
+
+    First-wins walks across methods are not used: zero hits → missing; more than
+    one hit → ambiguous ERROR message.
+    """
     ctx = get_context()
+    hits: list[object] = []
     for command in _HTTP_COMMANDS:
         row = ctx.db.get_measurement("messaging", command, key, row_index=0)
         if row is not None and row.value is not None:
-            return cast("object", row.value)
-    return None
+            hits.append(cast("object", row.value))
+    if not hits:
+        return None, None
+    if len(hits) > 1:
+        return None, (
+            f"ambiguous HTTP measurement key {key!r}: "
+            "matches multiple methods; use a distinct key per request"
+        )
+    return hits[0], None
 
 
 @verification
@@ -250,6 +263,9 @@ def verify_status(
 ) -> VerificationResult:
     """Verify a prior HTTP measurement has the expected status code.
 
+    The ``key`` must match exactly one prior HTTP request measurement. Reusing
+    the same key across methods is an ERROR.
+
     :param key: Evidence key for this operation. Keep distinct keys for separate facts; see the
         evidence lookup rules in the core guide.
     :param expected: Expected HTTP status code (for example 200).
@@ -260,7 +276,9 @@ def verify_status(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
-    value = _lookup_http_measurement(key)
+    value, ambiguity = _lookup_http_measurement(key)
+    if ambiguity is not None:
+        return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
     if not isinstance(value, dict) or "status_code" not in value:
@@ -301,7 +319,9 @@ def verify_body_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
-    value = _lookup_http_measurement(key)
+    value, ambiguity = _lookup_http_measurement(key)
+    if ambiguity is not None:
+        return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
     if not isinstance(value, dict) or "body" not in value:

@@ -20,7 +20,7 @@ python -m pip install "./colosseum_messaging-<version>-py3-none-any.whl"
 ```
 
 This installs the complete plugin (HTTP via stdlib, Redis, ZMQ, MQTT, SSH, and
-SCP). It requires `colosseum-core` `>=0.17.0,<0.18` and registers the `messaging`
+SCP). It requires `colosseum-core` `>=0.18,<0.19` and registers the `messaging`
 namespace through the `colosseum.plugins` entry point.
 
 HTTP uses the Python standard library (`http.client`) so the default install
