@@ -51,6 +51,8 @@ class HttpClientWrapper:
         req_timeout = self._timeout if timeout is None else float(timeout)
         req_headers = dict(headers or {})
         body: bytes | None = None
+        if json_body is not None and data is not None:
+            raise ValueError("http request cannot set both json and data")
         if json_body is not None:
             body = json.dumps(json_body).encode("utf-8")
             req_headers.setdefault("Content-Type", "application/json")
