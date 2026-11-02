@@ -3,12 +3,12 @@
 from importlib.metadata import distribution
 
 import colosseum_messaging
-import paho.mqtt.client
-import paramiko
+import paho.mqtt.client  # noqa: F401 - importability smoke for declared deps
+import paramiko  # noqa: F401
 
-import redis
-import scp
-import zmq
+import redis  # noqa: F401
+import scp  # noqa: F401
+import zmq  # noqa: F401
 
 
 def test_complete_runtime_dependencies_are_installed_by_default() -> None:
@@ -21,12 +21,12 @@ def test_complete_runtime_dependencies_are_installed_by_default() -> None:
     assert any(requirement.startswith("paho-mqtt") for requirement in requirements)
     assert any(requirement.startswith("paramiko") for requirement in requirements)
     assert any(requirement.startswith("scp") for requirement in requirements)
+    assert not any(requirement.startswith("pytest") for requirement in requirements)
+    assert not any(requirement.startswith("ruff") for requirement in requirements)
+    assert not any(requirement.startswith("mypy") for requirement in requirements)
+    assert not any(requirement.startswith("bandit") for requirement in requirements)
+    assert not any(requirement.startswith("vulture") for requirement in requirements)
     assert not metadata.metadata.get_all("Provides-Extra")
-    assert redis.Redis is not None
-    assert zmq.Context is not None
-    assert paho.mqtt.client.Client is not None
-    assert paramiko.SSHClient is not None
-    assert scp.SCPClient is not None
 
 
 def test_plugin_entry_points_and_version_match_metadata() -> None:

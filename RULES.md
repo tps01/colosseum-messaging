@@ -63,12 +63,13 @@ Only the following licenses are allowed:
 
 ## Packaging
 
-- Provide exactly one simple pip install that gets everything needed to develop
-  and run tests (for example `pip install -e .` or `pip install
-<this-package>`).
-- Do not split runtime drivers or developer/test tooling into optional extras
-  such as `[web]`, `[desktop]`, `[test]`, `[static]`, or `[docs]`. Put those
-  packages in the main `dependencies` list in `pyproject.toml`.
+- Put runtime packages in `[project].dependencies` in `pyproject.toml`. Wheel
+  and offline installs follow that list only (what test-script authors need).
+- Put developer, test, and static-analysis tooling in `requirements.txt`
+  (starts with `-e .`). Developers and CI use
+  `python -m pip install -r requirements.txt`.
+- Do not use optional extras such as `[web]`, `[desktop]`, `[test]`,
+  `[static]`, or `[docs]` for drivers or tooling.
 - Platform- or Python-version environment markers on individual dependencies are
   fine when a package only applies on that platform.
 
