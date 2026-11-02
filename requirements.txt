@@ -1,5 +1,6 @@
 # Developer install: runtime (via editable package) plus test and static tools.
 -e .
+types-PyYAML>=6.0,<7
 pytest>=8.0
 bandit[toml]>=1.7
 vulture>=2.11
