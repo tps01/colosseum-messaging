@@ -26,6 +26,7 @@ class RedisClientWrapper:
                 f"messaging.redis driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
             )
         self._sim = driver == "sim"
+        self._mailbox_token: int | None = None
         self._client: redis.Redis | None = None
         self._pubsub: object | None = None
         self._subscribed_channel: str | None = None
@@ -36,6 +37,9 @@ class RedisClientWrapper:
         self._server_prefix = f"redis:{config.get('host')}:{config.get('port', 6379)}"
         self._kv_prefix = f"{self._server_prefix}:{self._db}"
         if self._sim:
+            # Subscribe at construction so publish-then-receive on the same
+            # client still delivers (messages fan out to every token).
+            self._mailbox_token = SIM_MAILBOX.subscribe(self._server_prefix)
             _logger.debug("Redis client sim mode enabled")
             return
         kwargs: dict[str, object] = {
@@ -82,7 +86,7 @@ class RedisClientWrapper:
     def _publish(self, channel: str, message: str) -> None:
         _logger.debug("Redis PUBLISH %s", channel)
         if self._sim:
-            SIM_MAILBOX.publish(f"{self._server_prefix}:{channel}", channel, message)
+            SIM_MAILBOX.publish(self._server_prefix, channel, message)
             return
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
@@ -97,11 +101,23 @@ class RedisClientWrapper:
     def _receive(self, channel: str, timeout: float = 1.0) -> dict[str, str]:
         _logger.debug("Redis RECEIVE %s timeout=%ss", channel, timeout)
         if self._sim:
-            item = SIM_MAILBOX.receive(f"{self._server_prefix}:{channel}", timeout)
-            if item is None:
-                raise TimeoutError(f"No Redis message on channel {channel!r} within {timeout}s")
-            topic, payload = item
-            return {"topic": topic, "payload": payload}
+            if self._mailbox_token is None:
+                raise RuntimeError("Redis sim client is not registered")
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = max(0.0, deadline - time.monotonic())
+                item = SIM_MAILBOX.receive(self._mailbox_token, remaining)
+                if item is None:
+                    raise TimeoutError(
+                        f"No Redis message on channel {channel!r} within {timeout}s",
+                    )
+                topic, payload = item
+                if topic == channel:
+                    return {"topic": topic, "payload": payload}
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"No Redis message on channel {channel!r} within {timeout}s",
+                    )
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
         if self._pubsub is None or self._subscribed_channel != channel:
@@ -160,6 +176,9 @@ class RedisClientWrapper:
     def close(self) -> None:
         self.stop_listen()
         self.stop_sender()
+        if self._mailbox_token is not None:
+            SIM_MAILBOX.unsubscribe(self._mailbox_token)
+            self._mailbox_token = None
         if self._pubsub is not None:
             try:
                 close = getattr(self._pubsub, "close", None)
