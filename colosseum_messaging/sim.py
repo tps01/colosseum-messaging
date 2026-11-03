@@ -15,12 +15,16 @@ class _MailboxStore:
         # mailbox_key -> token -> per-subscriber queue
         self._subscribers: dict[str, dict[int, deque[tuple[str, str]]]] = defaultdict(dict)
         self._token_keys: dict[int, str] = {}
+        # Publishes that arrived before any subscriber; copied into each new
+        # subscriber queue so lazy ZMQ SUB construction still sees earlier PUBs.
+        self._pending: dict[str, deque[tuple[str, str]]] = defaultdict(deque)
 
     def subscribe(self, mailbox_key: str) -> int:
         """Create a per-subscriber queue for ``mailbox_key``; return its token."""
         with self._lock:
             token = next(self._tokens)
-            self._subscribers[mailbox_key][token] = deque()
+            queue: deque[tuple[str, str]] = deque(self._pending.get(mailbox_key, ()))
+            self._subscribers[mailbox_key][token] = queue
             self._token_keys[token] = mailbox_key
             return token
 
@@ -35,11 +39,17 @@ class _MailboxStore:
                 queues.pop(token, None)
                 if not queues:
                     self._subscribers.pop(mailbox_key, None)
+                    self._pending.pop(mailbox_key, None)
 
     def publish(self, mailbox_key: str, topic: str, payload: str) -> None:
         with self._lock:
-            for queue in self._subscribers.get(mailbox_key, {}).values():
-                queue.append((topic, payload))
+            queues = self._subscribers.get(mailbox_key)
+            if queues:
+                for queue in queues.values():
+                    queue.append((topic, payload))
+                self._pending.pop(mailbox_key, None)
+            else:
+                self._pending[mailbox_key].append((topic, payload))
 
     def receive(self, token: int, timeout: float) -> tuple[str, str] | None:
         deadline = time.monotonic() + max(timeout, 0.0)

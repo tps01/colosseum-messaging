@@ -6,15 +6,20 @@ from colosseum_messaging.zmq.client import ZmqClientWrapper
 
 
 def test_sim_pub_sub_roundtrip() -> None:
+    endpoint = "inproc://zmq-roundtrip"
     pub = ZmqClientWrapper(
-        {"endpoint": "tcp://127.0.0.1:5555", "socket": "pub", "driver": "sim"},
+        {"endpoint": endpoint, "socket": "pub", "driver": "sim"},
     )
     sub = ZmqClientWrapper(
-        {"endpoint": "tcp://127.0.0.1:5555", "socket": "sub", "driver": "sim"},
+        {"endpoint": endpoint, "socket": "sub", "driver": "sim"},
     )
-    pub.send("hello", topic="t1")
-    msg = sub.receive(timeout=0.5)
-    assert msg == {"topic": "t1", "payload": "hello"}
+    try:
+        pub.send("hello", topic="t1")
+        msg = sub.receive(timeout=0.5)
+        assert msg == {"topic": "t1", "payload": "hello"}
+    finally:
+        pub.close()
+        sub.close()
 
 
 def test_sim_publish_fans_out_to_each_subscriber() -> None:
@@ -29,6 +34,29 @@ def test_sim_publish_fans_out_to_each_subscriber() -> None:
     sub_b = ZmqClientWrapper(
         {"endpoint": endpoint, "socket": "sub", "topic": topic, "driver": "sim"},
     )
-    pub.send("hello", topic=topic)
-    assert sub_a.receive(timeout=0.5) == {"topic": topic, "payload": "hello"}
-    assert sub_b.receive(timeout=0.5) == {"topic": topic, "payload": "hello"}
+    try:
+        pub.send("hello", topic=topic)
+        assert sub_a.receive(timeout=0.5) == {"topic": topic, "payload": "hello"}
+        assert sub_b.receive(timeout=0.5) == {"topic": topic, "payload": "hello"}
+    finally:
+        pub.close()
+        sub_a.close()
+        sub_b.close()
+
+
+def test_sim_publish_before_subscribe_is_delivered() -> None:
+    endpoint = "inproc://zmq-late-sub"
+    pub = ZmqClientWrapper(
+        {"endpoint": endpoint, "socket": "pub", "driver": "sim"},
+    )
+    try:
+        pub.send("hello", topic="t1")
+        sub = ZmqClientWrapper(
+            {"endpoint": endpoint, "socket": "sub", "driver": "sim"},
+        )
+        try:
+            assert sub.receive(timeout=0.5) == {"topic": "t1", "payload": "hello"}
+        finally:
+            sub.close()
+    finally:
+        pub.close()
