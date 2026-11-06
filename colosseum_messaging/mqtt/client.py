@@ -32,12 +32,14 @@ class MqttClientWrapper:
             )
         self._sim = driver == "sim"
         self._mailbox_key = f"mqtt:{self._host}:{self._port}"
+        self._mailbox_token: int | None = None
         self._client: mqtt.Client | None = None
         self._incoming: queue.Queue[tuple[str, str]] = queue.Queue()
         self._subscribed_topic: str | None = None
         self._listen_pump = PumpHandle()
         self._send_pump = PumpHandle()
         if self._sim:
+            self._mailbox_token = SIM_MAILBOX.subscribe(self._mailbox_key)
             _logger.debug("MQTT client sim mode host=%s", self._host)
             return
         client_id = str(config.get("client_id") or f"colosseum-{uuid.uuid4().hex[:8]}")
@@ -94,10 +96,12 @@ class MqttClientWrapper:
         subscribe_topic = self._topic if topic is None else topic
         _logger.debug("MQTT RECEIVE topic=%s timeout=%ss", subscribe_topic, timeout)
         if self._sim:
+            if self._mailbox_token is None:
+                raise RuntimeError("MQTT sim client is not registered")
             deadline = time.monotonic() + timeout
             while True:
                 remaining = max(0.0, deadline - time.monotonic())
-                item = SIM_MAILBOX.receive(self._mailbox_key, remaining)
+                item = SIM_MAILBOX.receive(self._mailbox_token, remaining)
                 if item is None:
                     raise TimeoutError(
                         f"No MQTT message on {subscribe_topic!r} within {timeout}s",
@@ -161,6 +165,9 @@ class MqttClientWrapper:
     def close(self) -> None:
         self.stop_listen()
         self.stop_sender()
+        if self._mailbox_token is not None:
+            SIM_MAILBOX.unsubscribe(self._mailbox_token)
+            self._mailbox_token = None
         if self._client is not None:
             try:
                 self._client.loop_stop()

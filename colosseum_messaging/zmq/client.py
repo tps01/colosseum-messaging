@@ -42,11 +42,14 @@ class ZmqClientWrapper:
                 f"messaging.zmq driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
             )
         self._sim = driver == "sim"
+        self._mailbox_token: int | None = None
         self._context: zmq.Context[zmq.Socket[bytes]] | None = None
         self._socket: zmq.Socket[bytes] | None = None
         self._listen_pump = PumpHandle()
         self._send_pump = PumpHandle()
         if self._sim:
+            if self._socket_kind == "sub":
+                self._mailbox_token = SIM_MAILBOX.subscribe(self._endpoint)
             _logger.debug(
                 "ZMQ client sim mode endpoint=%s socket=%s", self._endpoint, self._socket_kind,
             )
@@ -92,6 +95,8 @@ class ZmqClientWrapper:
             raise RuntimeError("ZMQ receive requires socket='sub'")
         _logger.debug("ZMQ RECEIVE endpoint=%s timeout=%ss", self._endpoint, timeout)
         if self._sim:
+            if self._mailbox_token is None:
+                raise RuntimeError("ZMQ sim subscriber is not registered")
             deadline = time.monotonic() + timeout
             while True:
                 remaining = deadline - time.monotonic()
@@ -99,7 +104,7 @@ class ZmqClientWrapper:
                     raise TimeoutError(
                         f"No ZMQ message on {self._endpoint!r} within {timeout}s",
                     )
-                item = SIM_MAILBOX.receive(self._endpoint, remaining)
+                item = SIM_MAILBOX.receive(self._mailbox_token, remaining)
                 if item is None:
                     raise TimeoutError(
                         f"No ZMQ message on {self._endpoint!r} within {timeout}s",
@@ -155,6 +160,9 @@ class ZmqClientWrapper:
     def close(self) -> None:
         self.stop_listen()
         self.stop_sender()
+        if self._mailbox_token is not None:
+            SIM_MAILBOX.unsubscribe(self._mailbox_token)
+            self._mailbox_token = None
         if self._socket is not None:
             try:
                 self._socket.close(linger=0)
