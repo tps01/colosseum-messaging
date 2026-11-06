@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import json
 import ssl
+from email.message import Message
 from http.client import HTTPConnection, HTTPException, HTTPSConnection
-from typing import TYPE_CHECKING
+from http.cookiejar import CookieJar, DefaultCookiePolicy
+from typing import TYPE_CHECKING, cast
 from urllib.parse import SplitResult, urljoin, urlsplit
+from urllib.request import Request
 
 from colosseum.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from http.client import HTTPResponse
 
 _logger = get_logger("colosseum.messaging.http")
 _ALLOWED_DRIVERS = frozenset({"sim", "http"})
@@ -18,6 +22,19 @@ _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _MAX_REDIRECTS = 5
 _SENSITIVE_HEADERS = frozenset({"authorization", "cookie"})
 _BODY_HEADERS = frozenset({"content-length", "transfer-encoding"})
+
+
+class _CookieHeaderResponse:
+    """Minimal response facade for ``CookieJar.extract_cookies``."""
+
+    def __init__(self, header_pairs: list[tuple[str, str]]) -> None:
+        message = Message()
+        for name, value in header_pairs:
+            message.add_header(name, value)
+        self._message = message
+
+    def info(self) -> Message:
+        return self._message
 
 
 class HttpClientWrapper:
@@ -32,7 +49,7 @@ class HttpClientWrapper:
                 f"messaging.http driver must be one of {sorted(_ALLOWED_DRIVERS)}, got {driver!r}",
             )
         self._sim = driver == "sim"
-        self._cookies: dict[tuple[str, str, int], dict[str, str]] = {}
+        self._cookies = CookieJar(policy=DefaultCookiePolicy(rfc2965=False))
         if self._sim:
             _logger.debug("HTTP client sim mode enabled base_url=%s", self._base_url)
 
@@ -147,38 +164,37 @@ class HttpClientWrapper:
         return status, raw.decode("utf-8", errors="replace"), location, header_pairs
 
     def _with_cookies(self, url: str, headers: Mapping[str, str]) -> dict[str, str]:
-        jar = self._cookies.get(_origin(url), {})
+        request = Request(url)
+        self._cookies.add_cookie_header(request)
         merged: dict[str, str] = {}
-        existing = ""
+        jar_cookie = request.get_header("Cookie") or ""
+        for part in jar_cookie.split(";"):
+            if "=" not in part:
+                continue
+            name, value = part.split("=", 1)
+            token = name.strip()
+            if token:
+                merged[token] = value.strip()
         for name, value in headers.items():
-            if name.lower() == "cookie":
-                existing = value
-        if existing:
-            for part in existing.split(";"):
+            if name.lower() != "cookie":
+                continue
+            for part in value.split(";"):
                 if "=" not in part:
                     continue
-                name, value = part.split("=", 1)
-                token = name.strip()
+                cookie_name, cookie_value = part.split("=", 1)
+                token = cookie_name.strip()
                 if token:
-                    merged[token] = value.strip()
-        merged.update(jar)
+                    merged[token] = cookie_value.strip()
         out = {name: value for name, value in headers.items() if name.lower() != "cookie"}
         if merged:
             out["Cookie"] = "; ".join(f"{name}={value}" for name, value in merged.items())
         return out
 
     def _store_cookies(self, url: str, header_pairs: list[tuple[str, str]]) -> None:
-        jar = self._cookies.setdefault(_origin(url), {})
-        for name, value in header_pairs:
-            if name.lower() != "set-cookie":
-                continue
-            pair = value.split(";", 1)[0]
-            if "=" not in pair:
-                continue
-            cookie_name, cookie_value = pair.split("=", 1)
-            token = cookie_name.strip()
-            if token:
-                jar[token] = cookie_value.strip()
+        request = Request(url)
+        # CookieJar only needs ``info()`` with Set-Cookie; not a live socket response.
+        response = cast("HTTPResponse", _CookieHeaderResponse(header_pairs))
+        self._cookies.extract_cookies(response, request)
 
     def _sim_request(self, method: str, path: str, *, body: bytes | None) -> dict[str, object]:
         payload = "" if body is None else body.decode("utf-8", errors="replace")
