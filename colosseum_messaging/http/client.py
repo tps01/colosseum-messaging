@@ -5,7 +5,7 @@ import ssl
 from email.message import Message
 from http.client import HTTPConnection, HTTPException, HTTPSConnection
 from http.cookiejar import CookieJar, DefaultCookiePolicy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import SplitResult, urljoin, urlsplit
 from urllib.request import Request
 
@@ -13,6 +13,7 @@ from colosseum.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from http.client import HTTPResponse
 
 _logger = get_logger("colosseum.messaging.http")
 _ALLOWED_DRIVERS = frozenset({"sim", "http"})
@@ -191,7 +192,9 @@ class HttpClientWrapper:
 
     def _store_cookies(self, url: str, header_pairs: list[tuple[str, str]]) -> None:
         request = Request(url)
-        self._cookies.extract_cookies(_CookieHeaderResponse(header_pairs), request)
+        # CookieJar only needs ``info()`` with Set-Cookie; not a live socket response.
+        response = cast("HTTPResponse", _CookieHeaderResponse(header_pairs))
+        self._cookies.extract_cookies(response, request)
 
     def _sim_request(self, method: str, path: str, *, body: bytes | None) -> dict[str, object]:
         payload = "" if body is None else body.decode("utf-8", errors="replace")
