@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from colosseum.decorators import command, measurement
+from colosseum.logging import get_logger
 
 from colosseum_messaging.connections import get_ssh_client
 from colosseum_messaging.scp.client import ScpClientWrapper
+
+_logger = get_logger("colosseum.messaging")
 
 
 def _scp(ssh_id: int) -> ScpClientWrapper:
@@ -35,6 +38,7 @@ def put(
     :returns: None; the command outcome is recorded.
     """
     _ = key
+    _logger.info("Uploading %s to %s via SCP on SSH %s", local, remote, ssh_id)
     _scp(ssh_id).put(local, remote, recursive=recursive, max_depth=max_depth)
 
 
@@ -70,6 +74,7 @@ def get(
     :returns: List of saved local download paths, recorded as measurement evidence.
     """
     _ = key
+    _logger.info("Downloading %s to %s via SCP on SSH %s", remote, local, ssh_id)
     return _scp(ssh_id).get(
         remote,
         local,

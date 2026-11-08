@@ -11,12 +11,15 @@ from colosseum.decorators import (
     missing_measurement_result,
     verification,
 )
+from colosseum.logging import get_logger
 
 from colosseum_messaging._listen import drain_writes, make_handler, verify_recorded
 from colosseum_messaging.connections import get_zmq_client
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+_logger = get_logger("colosseum.messaging")
 
 _LISTEN_COMMAND = "zmq.listen"
 
@@ -31,6 +34,7 @@ def send(*, zmq_id: int, payload: str, topic: str = "", key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Sending ZMQ message on %s topic %s", zmq_id, topic)
     get_zmq_client(zmq_id).send(payload, topic=topic)
 
 
@@ -45,6 +49,7 @@ def receive(*, zmq_id: int, key: str, timeout: float = 1.0) -> dict[str, str]:
     :returns: ``{"topic": str, "payload": str}``.
     """
     _ = key
+    _logger.info("Receiving ZMQ message on %s", zmq_id)
     return get_zmq_client(zmq_id).receive(timeout=timeout)
 
 
@@ -77,6 +82,7 @@ def verify_payload_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying ZMQ payload for key %s", key)
     value = _lookup_payload(key, ("zmq.receive",))
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
@@ -123,6 +129,7 @@ def listen(
     :param fail_pattern: Regex applied to ``payload``. Empty matches nothing.
     :param on_message: Optional hook called with ``{"topic", "payload"}``.
     """
+    _logger.info("Listening for ZMQ messages on %s", zmq_id)
     get_zmq_client(zmq_id).start_listen(
         make_handler(
             command=_LISTEN_COMMAND,
@@ -145,6 +152,7 @@ def stop_listen(*, zmq_id: int, key: str = "") -> None:
     :param key: Evidence key for this command. Use the ``listen`` key.
     """
     _ = key
+    _logger.info("Stopping ZMQ listen on %s", zmq_id)
     get_zmq_client(zmq_id).stop_listen()
     drain_writes()
 
@@ -183,6 +191,7 @@ def verify_listen(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying ZMQ listen for key %s", key)
     return verify_recorded(
         command=_LISTEN_COMMAND,
         key=key,
@@ -207,6 +216,7 @@ def start_sender(*, zmq_id: int, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Starting ZMQ sender on %s", zmq_id)
     get_zmq_client(zmq_id).start_sender()
 
 
@@ -224,6 +234,7 @@ def enqueue(*, zmq_id: int, payload: str, topic: str = "", key: str = "") -> Non
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Queueing ZMQ message on %s topic %s", zmq_id, topic)
     get_zmq_client(zmq_id).enqueue(payload, topic)
 
 
@@ -239,4 +250,5 @@ def stop_sender(*, zmq_id: int, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Stopping ZMQ sender on %s", zmq_id)
     get_zmq_client(zmq_id).stop_sender()

@@ -11,12 +11,15 @@ from colosseum.decorators import (
     missing_measurement_result,
     verification,
 )
+from colosseum.logging import get_logger
 
 from colosseum_messaging._listen import drain_writes, make_handler, verify_recorded
 from colosseum_messaging.connections import get_mqtt_client
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+_logger = get_logger("colosseum.messaging")
 
 _LISTEN_COMMAND = "mqtt.listen"
 
@@ -31,6 +34,7 @@ def publish(*, mqtt_id: int, topic: str, payload: str, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Publishing MQTT message to %s on %s", topic, mqtt_id)
     get_mqtt_client(mqtt_id).publish(topic, payload)
 
 
@@ -52,6 +56,7 @@ def receive(
     :returns: ``{"topic": str, "payload": str}``.
     """
     _ = key
+    _logger.info("Receiving MQTT message on %s from %s", topic, mqtt_id)
     return get_mqtt_client(mqtt_id).receive(timeout=timeout, topic=topic)
 
 
@@ -84,6 +89,7 @@ def verify_payload_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying MQTT payload for key %s", key)
     value = _lookup_payload(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
@@ -135,6 +141,7 @@ def listen(
     :param fail_pattern: Regex applied to ``payload``. Empty matches nothing.
     :param on_message: Optional hook called with ``{"topic", "payload"}``.
     """
+    _logger.info("Listening for MQTT messages on %s topic %s", mqtt_id, topic)
     get_mqtt_client(mqtt_id).start_listen(
         make_handler(
             command=_LISTEN_COMMAND,
@@ -158,6 +165,7 @@ def stop_listen(*, mqtt_id: int, key: str = "") -> None:
     :param key: Evidence key for this command. Use the ``listen`` key.
     """
     _ = key
+    _logger.info("Stopping MQTT listen on %s", mqtt_id)
     get_mqtt_client(mqtt_id).stop_listen()
     drain_writes()
 
@@ -196,6 +204,7 @@ def verify_listen(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying MQTT listen for key %s", key)
     return verify_recorded(
         command=_LISTEN_COMMAND,
         key=key,
@@ -223,6 +232,7 @@ def start_sender(*, mqtt_id: int, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Starting MQTT sender on %s", mqtt_id)
     get_mqtt_client(mqtt_id).start_sender()
 
 
@@ -240,6 +250,7 @@ def enqueue(*, mqtt_id: int, topic: str, payload: str, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Queueing MQTT message to %s on %s", topic, mqtt_id)
     get_mqtt_client(mqtt_id).enqueue(topic, payload)
 
 
@@ -255,4 +266,5 @@ def stop_sender(*, mqtt_id: int, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Stopping MQTT sender on %s", mqtt_id)
     get_mqtt_client(mqtt_id).stop_sender()
