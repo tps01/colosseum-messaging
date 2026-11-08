@@ -154,6 +154,10 @@ def _document_controls(app, what, name, obj, options, lines):
             "Verification label in summaries and reports; omitted or blank "
             "uses the evidence key."
         ),
+        "requirements": (
+            "Requirement identifiers attached to this verification. "
+            "A comma-separated string or a list; omitted attaches none."
+        ),
     }}
     for parameter, description in controls.items():
         if (
