@@ -10,11 +10,14 @@ from colosseum.decorators import (
     missing_measurement_result,
     verification,
 )
+from colosseum.logging import get_logger
 
 from colosseum_messaging.connections import get_http_client
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+_logger = get_logger("colosseum.messaging")
 
 _HTTP_COMMANDS = (
     "http.get",
@@ -72,6 +75,7 @@ def request(
 
     :returns: ``{"status_code": int, "body": str, "headers": dict}``.
     """
+    _logger.info("%s HTTP %s %s", http_id, method, path)
     return _request(
         http_id=http_id,
         method=method,
@@ -107,6 +111,7 @@ def get(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _logger.info("%s HTTP GET %s", http_id, path)
     return _request(
         http_id=http_id,
         method="GET",
@@ -146,6 +151,7 @@ def post(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _logger.info("%s HTTP POST %s", http_id, path)
     return _request(
         http_id=http_id,
         method="POST",
@@ -187,6 +193,7 @@ def put(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _logger.info("%s HTTP PUT %s", http_id, path)
     return _request(
         http_id=http_id,
         method="PUT",
@@ -222,6 +229,7 @@ def delete(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _logger.info("%s HTTP DELETE %s", http_id, path)
     return _request(
         http_id=http_id,
         method="DELETE",
@@ -276,6 +284,7 @@ def verify_status(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying HTTP status %s for key %s", expected, key)
     value, ambiguity = _lookup_http_measurement(key)
     if ambiguity is not None:
         return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
@@ -319,6 +328,7 @@ def verify_body_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying HTTP body for key %s", key)
     value, ambiguity = _lookup_http_measurement(key)
     if ambiguity is not None:
         return VerificationResult(status="ERROR", message=ambiguity, optional=optional)

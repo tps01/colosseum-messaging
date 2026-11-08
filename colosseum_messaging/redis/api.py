@@ -11,12 +11,15 @@ from colosseum.decorators import (
     missing_measurement_result,
     verification,
 )
+from colosseum.logging import get_logger
 
 from colosseum_messaging._listen import drain_writes, make_handler, verify_recorded
 from colosseum_messaging.connections import get_redis_client
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+_logger = get_logger("colosseum.messaging")
 
 _LISTEN_COMMAND = "redis.listen"
 
@@ -31,6 +34,7 @@ def set(*, redis_id: int, name: str, value: str, key: str = "") -> None:  # noqa
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Setting Redis key %s on %s", name, redis_id)
     get_redis_client(redis_id).set(name, value)
 
 
@@ -44,6 +48,7 @@ def publish(*, redis_id: int, channel: str, message: str, key: str = "") -> None
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Publishing Redis message to %s on %s", channel, redis_id)
     get_redis_client(redis_id).publish(channel, message)
 
 
@@ -58,6 +63,7 @@ def get(*, redis_id: int, name: str, key: str) -> str | None:
     :returns: Decoded string value, or ``None`` when missing.
     """
     _ = key
+    _logger.info("Reading Redis key %s on %s", name, redis_id)
     return get_redis_client(redis_id).get(name)
 
 
@@ -73,6 +79,7 @@ def receive(*, redis_id: int, channel: str, key: str, timeout: float = 1.0) -> d
     :returns: ``{"topic": channel, "payload": str}``.
     """
     _ = key
+    _logger.info("Receiving Redis message on %s from %s", channel, redis_id)
     return get_redis_client(redis_id).receive(channel, timeout=timeout)
 
 
@@ -96,6 +103,7 @@ def verify_value_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying Redis value for key %s", key)
     row = get_context().db.get_measurement("messaging", "redis.get", key, row_index=0)
     actual = None if row is None or row.value is None else str(row.value)
     if actual is None:
@@ -143,6 +151,7 @@ def listen(
     :param fail_pattern: Regex applied to ``payload``. Empty matches nothing.
     :param on_message: Optional hook called with ``{"topic", "payload"}``.
     """
+    _logger.info("Listening for Redis messages on %s from %s", channel, redis_id)
     get_redis_client(redis_id).start_listen(
         channel,
         make_handler(
@@ -166,6 +175,7 @@ def stop_listen(*, redis_id: int, key: str = "") -> None:
     :param key: Evidence key for this command. Use the ``listen`` key.
     """
     _ = key
+    _logger.info("Stopping Redis listen on %s", redis_id)
     get_redis_client(redis_id).stop_listen()
     drain_writes()
 
@@ -202,6 +212,7 @@ def verify_listen(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying Redis listen for key %s", key)
     return verify_recorded(
         command=_LISTEN_COMMAND,
         key=key,
@@ -226,6 +237,7 @@ def start_sender(*, redis_id: int, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Starting Redis sender on %s", redis_id)
     get_redis_client(redis_id).start_sender()
 
 
@@ -245,6 +257,7 @@ def enqueue(
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Queueing Redis message to %s on %s", channel, redis_id)
     get_redis_client(redis_id).enqueue(channel, message)
 
 
@@ -260,4 +273,5 @@ def stop_sender(*, redis_id: int, key: str = "") -> None:
     :param key: Optional evidence key for the command row.
     """
     _ = key
+    _logger.info("Stopping Redis sender on %s", redis_id)
     get_redis_client(redis_id).stop_sender()
