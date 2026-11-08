@@ -56,3 +56,31 @@ jobs:
           .package-venv/bin/pip install ../colosseum-core
           .package-venv/bin/pip install dist/*.whl
           .package-venv/bin/python -c "import colosseum_messaging, redis, zmq, paho.mqtt.client, paramiko, scp"
+
+  # Confirm the API pages build. Publishing stays on the develop pages workflow.
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: colosseum-messaging
+      - uses: actions/checkout@v7
+        with:
+          repository: tps01/colosseum-core
+          ref: develop
+          path: colosseum-core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install
+        working-directory: colosseum-messaging
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          python -m pip install -U pip
+          python -m pip install "sphinx>=7.0,<9"
+          python -m pip install -e ../colosseum-core
+          python -m pip install -r requirements.txt
+      - name: Build documentation
+        working-directory: colosseum-messaging
+        run: python scripts/build_pages.py
