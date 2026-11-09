@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import fnmatch
 import stat
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from colosseum_messaging.ssh._glob import fnmatch_name, path_has_glob
 from colosseum_messaging.ssh._remote_path import (
     normalize_remote_path,
     remote_basename,
@@ -16,6 +16,16 @@ from colosseum_messaging.ssh._remote_path import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+
+def path_has_glob(component: str) -> bool:
+    return any(char in component for char in "*?[")
+
+
+def fnmatch_name(name: str, pattern: str, *, case_sensitive: bool) -> bool:
+    if case_sensitive:
+        return fnmatch.fnmatchcase(name, pattern)
+    return fnmatch.fnmatchcase(name.lower(), pattern.lower())
 
 
 class RemoteLister(Protocol):
