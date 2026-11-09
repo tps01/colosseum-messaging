@@ -82,3 +82,5 @@ per connection phase. Pass `retries=` to SSH operations to override the attempt
 count (`0` or `1` makes one attempt). The SSH config row's `timeout` overrides
 the connection timeout; command `timeout=` is independent. Only connection setup
 is retried; remote operations are never replayed.
+
+See [starter fuzz testing](tests/fuzz/README.md) for seed replay and optional Atheris runs.

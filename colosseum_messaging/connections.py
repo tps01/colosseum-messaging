@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from colosseum.config.loader import ConfigError
 from colosseum.context import get_context
 from colosseum.logging import get_logger
-
-from colosseum_messaging._cache import cached_resource, close_cached_resources
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -44,22 +42,19 @@ def _cached_client(
     cfg = _require_config_item(section, item_id)
     driver = str(cfg.get("driver", default_driver)).lower()
 
-    def _open() -> T:
-        return wrapper_cls(cfg)
-
-    return cached_resource(
-        ctx.resource_cache,
-        key,
-        _open,
-        on_reuse=lambda: _logger.debug("Reusing cached %s id=%s", section, item_id),
-        on_open=lambda: _logger.debug(
-            "Opening %s id=%s driver=%s %s",
-            section,
-            item_id,
-            driver,
-            detail(cfg),
-        ),
+    if key in ctx.resource_cache:
+        _logger.debug("Reusing cached %s id=%s", section, item_id)
+        return cast("T", ctx.resource_cache[key])
+    _logger.debug(
+        "Opening %s id=%s driver=%s %s",
+        section,
+        item_id,
+        driver,
+        detail(cfg),
     )
+    client = wrapper_cls(cfg)
+    ctx.resource_cache[key] = client
+    return client
 
 
 def get_http_client(http_id: int) -> HttpClientWrapper:
@@ -132,16 +127,22 @@ def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
 
 def close_all() -> None:
     ctx = get_context()
-    close_cached_resources(
-        ctx.resource_cache,
-        (
-            (
-                "messaging:http:",
-                "messaging:redis:",
-                "messaging:zmq:",
-                "messaging:mqtt:",
-                "messaging:ssh:",
-            ),
-        ),
-        logger=_logger,
+    prefixes = (
+        "messaging:http:",
+        "messaging:redis:",
+        "messaging:zmq:",
+        "messaging:mqtt:",
+        "messaging:ssh:",
     )
+    keys = [key for key in ctx.resource_cache if key.startswith(prefixes)]
+    if keys:
+        _logger.debug("Closing %d cached resource(s)", len(keys))
+    for key in keys:
+        resource = ctx.resource_cache.pop(key, None)
+        close = getattr(resource, "close", None)
+        if not callable(close):
+            continue
+        try:
+            close()
+        except Exception:
+            _logger.exception("Failed to close cached resource %s", key)

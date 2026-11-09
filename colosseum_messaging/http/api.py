@@ -33,13 +33,11 @@ def _request(
     http_id: int,
     method: str,
     path: str,
-    key: str,
     json_body: object = None,
     data: bytes | str | None = None,
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> dict[str, object]:
-    _ = key
     return get_http_client(http_id).request(
         method,
         path,
@@ -75,12 +73,12 @@ def request(
 
     :returns: ``{"status_code": int, "body": str, "headers": dict}``.
     """
+    _ = key
     _logger.info("%s HTTP %s %s", http_id, method, path)
     return _request(
         http_id=http_id,
         method=method,
         path=path,
-        key=key,
         json_body=json,
         data=data,
         headers=headers,
@@ -111,12 +109,12 @@ def get(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
     _logger.info("%s HTTP GET %s", http_id, path)
     return _request(
         http_id=http_id,
         method="GET",
         path=path,
-        key=key,
         headers=headers,
         timeout=timeout,
     )
@@ -151,12 +149,12 @@ def post(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
     _logger.info("%s HTTP POST %s", http_id, path)
     return _request(
         http_id=http_id,
         method="POST",
         path=path,
-        key=key,
         json_body=json,
         data=data,
         headers=headers,
@@ -193,12 +191,12 @@ def put(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
     _logger.info("%s HTTP PUT %s", http_id, path)
     return _request(
         http_id=http_id,
         method="PUT",
         path=path,
-        key=key,
         json_body=json,
         data=data,
         headers=headers,
@@ -229,12 +227,12 @@ def delete(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
     _logger.info("%s HTTP DELETE %s", http_id, path)
     return _request(
         http_id=http_id,
         method="DELETE",
         path=path,
-        key=key,
         headers=headers,
         timeout=timeout,
     )
