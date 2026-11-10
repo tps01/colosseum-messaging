@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from colosseum.logging import get_logger
 
@@ -13,6 +13,14 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from colosseum_messaging._pump import Hook
+
+
+class _RedisPubSub(Protocol):
+    def get_message(self, *, timeout: float = ...) -> dict[str, object] | None: ...
+
+    def subscribe(self, *args: object, **kwargs: object) -> object: ...
+
+    def close(self) -> None: ...
 
 _logger = get_logger("colosseum.messaging.redis")
 _ALLOWED_DRIVERS = frozenset({"sim", "redis"})
@@ -28,7 +36,7 @@ class RedisClientWrapper:
         self._sim = driver == "sim"
         self._mailbox_token: int | None = None
         self._client: redis.Redis | None = None
-        self._pubsub: object | None = None
+        self._pubsub: _RedisPubSub | None = None
         self._subscribed_channel: str | None = None
         self._listen_pump = PumpHandle()
         self._send_pump = PumpHandle()
@@ -113,7 +121,7 @@ class RedisClientWrapper:
         pubsub = self._ensure_pubsub(channel)
 
         def poll(remaining: float) -> dict[str, object] | None:
-            return pubsub.get_message(timeout=remaining)  # type: ignore[union-attr, no-any-return]
+            return pubsub.get_message(timeout=remaining)
 
         message = deadline_poll(
             timeout,
@@ -125,23 +133,24 @@ class RedisClientWrapper:
         payload = "" if data is None else str(data)
         return {"topic": channel, "payload": payload}
 
-    def _ensure_pubsub(self, channel: str) -> object:
+    def _ensure_pubsub(self, channel: str) -> _RedisPubSub:
         if self._client is None:
             raise RuntimeError("Redis client is not connected")
         if self._pubsub is not None and self._subscribed_channel == channel:
             return self._pubsub
         if self._pubsub is not None:
             try:
-                close = getattr(self._pubsub, "close", None)
-                if callable(close):
-                    close()
+                self._pubsub.close()
             except Exception:
                 _logger.exception("Failed to close Redis pubsub before resubscribe")
             self._pubsub = None
-        self._pubsub = self._client.pubsub(  # type: ignore[no-untyped-call]
-            ignore_subscribe_messages=True,
+        self._pubsub = cast(
+            "_RedisPubSub",
+            self._client.pubsub(  # type: ignore[no-untyped-call]
+                ignore_subscribe_messages=True,
+            ),
         )
-        self._pubsub.subscribe(channel)  # type: ignore[union-attr]
+        self._pubsub.subscribe(channel)
         self._subscribed_channel = channel
         return self._pubsub
 
@@ -175,9 +184,7 @@ class RedisClientWrapper:
             self._mailbox_token = None
         if self._pubsub is not None:
             try:
-                close = getattr(self._pubsub, "close", None)
-                if callable(close):
-                    close()
+                self._pubsub.close()
             except Exception:
                 _logger.exception("Failed to close Redis pubsub")
             self._pubsub = None
