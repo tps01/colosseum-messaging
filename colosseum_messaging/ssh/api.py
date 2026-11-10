@@ -389,7 +389,7 @@ def _lookup_ssh_measurement(
         return None, None
     if len(hits) > 1:
         return None, (
-            f"ambiguous SSH measurement key {key!r}: " "matches multiple commands; use a distinct key per call"
+            f"ambiguous SSH measurement key {key!r}: matches multiple commands; use a distinct key per call"
         )
     return hits[0], None
 

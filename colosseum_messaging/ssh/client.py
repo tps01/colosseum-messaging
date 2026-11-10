@@ -108,7 +108,7 @@ class SSHClientWrapper:
         auth = str(config.get("auth", "auto")).strip().lower()
         if auth not in _ALLOWED_AUTH:
             raise ValueError(
-                f"messaging.ssh auth must be one of " f"{sorted(a for a in _ALLOWED_AUTH if a)}, got {auth!r}",
+                f"messaging.ssh auth must be one of {sorted(a for a in _ALLOWED_AUTH if a)}, got {auth!r}",
             )
         self._auth = auth or "auto"
         configured = str(config.get("platform", "")).strip().lower()
@@ -413,12 +413,12 @@ class SSHClientWrapper:
         if suffix == "":
             if platform == "windows":
                 raise MessagingCapabilityError(
-                    "exec_sequence on Windows requires interpreter= " "(Linux-first SSH; see README)",
+                    "exec_sequence on Windows requires interpreter= (Linux-first SSH; see README)",
                 )
             return {"mode": "stdin", "command": "bash -s"}
         if platform == "windows":
             raise MessagingCapabilityError(
-                f"exec_sequence suffix {suffix!r} on Windows requires interpreter= " "(Linux-first SSH; see README)",
+                f"exec_sequence suffix {suffix!r} on Windows requires interpreter= (Linux-first SSH; see README)",
             )
         return {"mode": "stdin", "command": "bash -s"}
 

@@ -63,7 +63,7 @@ def _linux_cpu_arch() -> str:
     if machine in {"aarch64", "arm64"}:
         return "aarch64"
     raise SystemExit(
-        f"Unsupported Linux machine={platform.machine()!r}; " "expected x86_64/amd64 or aarch64/arm64",
+        f"Unsupported Linux machine={platform.machine()!r}; expected x86_64/amd64 or aarch64/arm64",
     )
 
 
@@ -294,12 +294,12 @@ def main(argv: list[str] | None = None) -> int:
         "--zip",
         dest="archive",
         action="store_true",
-        help=("Write an archive next to the wheelhouse " "(Windows: .zip; Linux/macOS: .tar.gz). --zip is an alias."),
+        help=("Write an archive next to the wheelhouse (Windows: .zip; Linux/macOS: .tar.gz). --zip is an alias."),
     )
     parser.add_argument(
         "--os-label",
         default=None,
-        help=("OS token in archive name " "(default: windows / linux-x86_64 / linux-aarch64 / macos)"),
+        help=("OS token in archive name (default: windows / linux-x86_64 / linux-aarch64 / macos)"),
     )
     parser.add_argument(
         "--archive-dir",

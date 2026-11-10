@@ -248,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--keep-venvs",
         action="store_true",
-        help=("Keep top-level .venv/, .venv-*/, venv/, venv-*/, env/ " "(only scrub cache files inside)"),
+        help=("Keep top-level .venv/, .venv-*/, venv/, venv-*/, env/ (only scrub cache files inside)"),
     )
     args = parser.parse_args(argv)
     root = _repo_root()

@@ -96,10 +96,7 @@ def verify_payload_match(
     value = _lookup_payload(key)
     if value is None:
         return missing_measurement_result(key=key, optional=optional)
-    if isinstance(value, dict) and "payload" in value:
-        payload = str(value["payload"])
-    else:
-        payload = str(value)
+    payload = str(value["payload"]) if isinstance(value, dict) and "payload" in value else str(value)
     if re.search(pattern, payload):
         return VerificationResult(status="PASS", message="", optional=optional, actual=payload)
     return VerificationResult(

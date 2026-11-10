@@ -259,10 +259,7 @@ def map_remote_get_paths(
     mapped: list[tuple[str, Path]] = []
     for remote_path in remote_files:
         rel = _relative_remote(parent, remote_path)
-        if rel:
-            dest = local_root / Path(*rel.split("/"))
-        else:
-            dest = local_root / remote_basename(remote_path)
+        dest = local_root / Path(*rel.split("/")) if rel else local_root / remote_basename(remote_path)
         # Recheck the fully constructed destination, not only the local root.
         mapped.append((remote_path, resolve_local(str(dest))))
     return mapped
