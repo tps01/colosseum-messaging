@@ -63,6 +63,27 @@ class HttpClientWrapper:
         headers: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> dict[str, object]:
+        method_u, url, body, req_headers, req_timeout = self._prepare_request(
+            method, path, json_body=json_body, data=data, headers=headers, timeout=timeout,
+        )
+        _logger.debug("HTTP %s %s timeout=%ss", method_u, url, req_timeout)
+        if self._sim:
+            return self._sim_request(method_u, path, body=body)
+        status_code, text, header_pairs = self._follow_redirects(
+            method_u, url, body, req_headers, req_timeout,
+        )
+        return _finalize_response(status_code, text, header_pairs)
+
+    def _prepare_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: object,
+        data: bytes | str | None,
+        headers: Mapping[str, str] | None,
+        timeout: float | None,
+    ) -> tuple[str, str, bytes | None, dict[str, str], float]:
         method_u = method.upper()
         url = urljoin(self._base_url, path.lstrip("/"))
         req_timeout = self._timeout if timeout is None else float(timeout)
@@ -75,58 +96,40 @@ class HttpClientWrapper:
             req_headers.setdefault("Content-Type", "application/json")
         elif data is not None:
             body = data.encode("utf-8") if isinstance(data, str) else data
+        return method_u, url, body, req_headers, req_timeout
 
-        _logger.debug("HTTP %s %s timeout=%ss", method_u, url, req_timeout)
-        if self._sim:
-            return self._sim_request(method_u, path, body=body)
-
+    def _follow_redirects(
+        self,
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: dict[str, str],
+        timeout: float,
+    ) -> tuple[int, str, list[tuple[str, str]]]:
         redirects = 0
-        req_headers = self._with_cookies(url, req_headers)
+        method_u = method
+        req_headers = self._with_cookies(url, headers)
         try:
             while True:
                 status_code, text, location, header_pairs = self._exchange(
-                    method_u, url, body, req_headers, req_timeout,
+                    method_u, url, body, req_headers, timeout,
                 )
                 self._store_cookies(url, header_pairs)
-                if (
+                if not (
                     status_code in _REDIRECT_STATUSES
                     and location
                     and redirects < _MAX_REDIRECTS
                 ):
-                    redirects += 1
-                    next_url = urljoin(url, location)
-                    _require_http_url(next_url)
-                    current_origin = _origin(url)
-                    next_origin = _origin(next_url)
-                    if current_origin[0] == "https" and next_origin[0] == "http":
-                        raise ValueError(
-                            f"Refusing HTTPS to HTTP redirect from {url} to {next_url}",
-                        )
-                    # 301/302/303 already become GET with no body, including same-origin.
-                    # 307/308 keep the method and body only while the origin stays the same.
-                    if status_code in {301, 302, 303} and method_u not in {"GET", "HEAD"}:
-                        method_u = "GET"
-                        body = None
-                        req_headers = _headers_without(req_headers, _BODY_HEADERS)
-                    if current_origin != next_origin:
-                        req_headers = _headers_without(req_headers, _SENSITIVE_HEADERS)
-                        if body is not None:
-                            body = None
-                            req_headers = _headers_without(req_headers, _BODY_HEADERS)
-                    url = next_url
-                    req_headers = self._with_cookies(url, req_headers)
-                    continue
-                break
+                    return status_code, text, header_pairs
+                redirects += 1
+                next_url = urljoin(url, location)
+                method_u, body, req_headers = _rewrite_redirect(
+                    status_code, method_u, url, next_url, body, req_headers,
+                )
+                url = next_url
+                req_headers = self._with_cookies(url, req_headers)
         except (HTTPException, TimeoutError, OSError, ValueError) as exc:
             raise RuntimeError(f"HTTP {method_u} {url} failed: {exc}") from exc
-
-        preview = text[:200] + ("..." if len(text) > 200 else "")
-        _logger.debug("HTTP status=%s body=%r", status_code, preview)
-        return {
-            "status_code": status_code,
-            "body": text,
-            "headers": _header_map(header_pairs),
-        }
 
     def _exchange(
         self,
@@ -205,6 +208,52 @@ class HttpClientWrapper:
 
     def close(self) -> None:
         return
+
+
+def _rewrite_redirect(
+    status_code: int,
+    method: str,
+    current_url: str,
+    next_url: str,
+    body: bytes | None,
+    headers: dict[str, str],
+) -> tuple[str, bytes | None, dict[str, str]]:
+    _require_http_url(next_url)
+    current_origin = _origin(current_url)
+    next_origin = _origin(next_url)
+    if current_origin[0] == "https" and next_origin[0] == "http":
+        raise ValueError(
+            f"Refusing HTTPS to HTTP redirect from {current_url} to {next_url}",
+        )
+    # 301/302/303 already become GET with no body, including same-origin.
+    # 307/308 keep the method and body only while the origin stays the same.
+    method_u = method
+    req_headers = headers
+    req_body = body
+    if status_code in {301, 302, 303} and method_u not in {"GET", "HEAD"}:
+        method_u = "GET"
+        req_body = None
+        req_headers = _headers_without(req_headers, _BODY_HEADERS)
+    if current_origin != next_origin:
+        req_headers = _headers_without(req_headers, _SENSITIVE_HEADERS)
+        if req_body is not None:
+            req_body = None
+            req_headers = _headers_without(req_headers, _BODY_HEADERS)
+    return method_u, req_body, req_headers
+
+
+def _finalize_response(
+    status_code: int,
+    text: str,
+    header_pairs: list[tuple[str, str]],
+) -> dict[str, object]:
+    preview = text[:200] + ("..." if len(text) > 200 else "")
+    _logger.debug("HTTP status=%s body=%r", status_code, preview)
+    return {
+        "status_code": status_code,
+        "body": text,
+        "headers": _header_map(header_pairs),
+    }
 
 
 def _origin(url: str) -> tuple[str, str, int]:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colosseum-messaging"
-version = "0.8.7"
+version = "0.8.8"
 description = "Colosseum messaging plugin (HTTP, Redis, ZMQ, MQTT, SSH, SCP)"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -37,11 +37,17 @@ line-length = 100
 src = ["colosseum_messaging"]
 
 [tool.ruff.lint]
-select = ["A", "BLE", "FBT", "N", "COM", "C4", "ISC", "ICN", "TID", "TCH", "E", "F", "W", "I", "B", "UP", "ANN", "ARG", "SIM", "RET", "PTH"]
+preview = true
+explicit-preview-rules = true
+select = ["A", "BLE", "FBT", "N", "COM", "C4", "C901", "ISC", "ICN", "TID", "TCH", "E", "F", "W", "I", "B", "UP", "ANN", "ARG", "SIM", "RET", "PTH", "PLR1702", "PLR0914", "PLR0915", "PLR0912"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN", "ARG", "S101"]
-"examples/**" = ["ANN", "ARG"]
+"tests/**" = ["ANN", "ARG", "S101", "C901", "PLR0912", "PLR0914", "PLR0915", "PLR1702"]
+"examples/**" = ["ANN", "ARG", "C901", "PLR0912", "PLR0914", "PLR0915", "PLR1702"]
+"scripts/**" = ["C901", "PLR0912", "PLR0914", "PLR0915", "PLR1702"]
 "colosseum_messaging/http/**" = ["A005"]
 "colosseum_messaging/ssh/_background.py" = ["TC003"]
 "colosseum_messaging/ssh/_sim.py" = ["TC003"]

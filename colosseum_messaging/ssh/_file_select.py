@@ -66,54 +66,112 @@ def select_remote_files(
     normalized = normalize_remote_path(remote)
     pattern = remote_basename(normalized)
     parent = remote_dirname(normalized)
-    has_glob = path_has_glob(pattern)
-    results: list[tuple[str, float]] = []
-
-    def add_file(path: str, mtime: float) -> None:
-        results.append((path, mtime))
-
-    def walk_dir(dir_path: str, depth: int, name_pattern: str | None) -> None:
-        try:
-            entries = lister.listdir_attr(dir_path)
-        except OSError:
-            return
-        for attr in entries:
-            name = str(getattr(attr, "filename", ""))
-            if name in (".", ".."):
-                continue
-            child = _join_remote(dir_path, name)
-            mode = getattr(attr, "st_mode", None)
-            mtime = float(getattr(attr, "st_mtime", 0) or 0)
-            if _is_dir(mode):
-                if recursive and (max_depth is None or depth < max_depth):
-                    walk_dir(child, depth + 1, name_pattern)
-            elif name_pattern is None or fnmatch_name(
-                name, name_pattern, case_sensitive=case_sensitive,
-            ):
-                add_file(child, mtime)
-
-    if has_glob:
-        walk_dir(parent, 0, pattern)
+    if path_has_glob(pattern):
+        results = _walk_remote_dir(
+            lister,
+            parent,
+            depth=0,
+            max_depth=max_depth,
+            recursive=recursive,
+            name_pattern=pattern,
+            case_sensitive=case_sensitive,
+        )
     elif not recursive:
-        try:
-            attr = lister.stat(normalized)
-        except OSError as exc:
-            raise FileNotFoundError(normalized) from exc
-        mode = getattr(attr, "st_mode", None)
-        if _is_dir(mode):
-            raise ValueError(f"Remote path {normalized!r} is a directory; set recursive=True")
-        add_file(normalized, float(getattr(attr, "st_mtime", 0) or 0))
+        results = [_stat_remote_file(lister, normalized)]
     else:
-        try:
-            attr = lister.stat(normalized)
-        except OSError as exc:
-            raise FileNotFoundError(normalized) from exc
-        mode = getattr(attr, "st_mode", None)
-        if _is_dir(mode):
-            walk_dir(normalized, 0, None)
-        else:
-            add_file(normalized, float(getattr(attr, "st_mtime", 0) or 0))
+        results = _select_remote_recursive(
+            lister,
+            normalized,
+            max_depth=max_depth,
+            case_sensitive=case_sensitive,
+        )
+    return _apply_mtime_filters(results, newest=newest, oldest=oldest)
 
+
+def _stat_remote_file(lister: RemoteLister, path: str) -> tuple[str, float]:
+    try:
+        attr = lister.stat(path)
+    except OSError as exc:
+        raise FileNotFoundError(path) from exc
+    mode = getattr(attr, "st_mode", None)
+    if _is_dir(mode):
+        raise ValueError(f"Remote path {path!r} is a directory; set recursive=True")
+    return path, float(getattr(attr, "st_mtime", 0) or 0)
+
+
+def _select_remote_recursive(
+    lister: RemoteLister,
+    path: str,
+    *,
+    max_depth: int | None,
+    case_sensitive: bool,
+) -> list[tuple[str, float]]:
+    try:
+        attr = lister.stat(path)
+    except OSError as exc:
+        raise FileNotFoundError(path) from exc
+    mode = getattr(attr, "st_mode", None)
+    if _is_dir(mode):
+        return _walk_remote_dir(
+            lister,
+            path,
+            depth=0,
+            max_depth=max_depth,
+            recursive=True,
+            name_pattern=None,
+            case_sensitive=case_sensitive,
+        )
+    return [(path, float(getattr(attr, "st_mtime", 0) or 0))]
+
+
+def _walk_remote_dir(
+    lister: RemoteLister,
+    dir_path: str,
+    *,
+    depth: int,
+    max_depth: int | None,
+    recursive: bool,
+    name_pattern: str | None,
+    case_sensitive: bool,
+) -> list[tuple[str, float]]:
+    try:
+        entries = lister.listdir_attr(dir_path)
+    except OSError:
+        return []
+    results: list[tuple[str, float]] = []
+    for attr in entries:
+        name = str(getattr(attr, "filename", ""))
+        if name in (".", ".."):
+            continue
+        child = _join_remote(dir_path, name)
+        mode = getattr(attr, "st_mode", None)
+        mtime = float(getattr(attr, "st_mtime", 0) or 0)
+        if _is_dir(mode):
+            if recursive and (max_depth is None or depth < max_depth):
+                results.extend(
+                    _walk_remote_dir(
+                        lister,
+                        child,
+                        depth=depth + 1,
+                        max_depth=max_depth,
+                        recursive=recursive,
+                        name_pattern=name_pattern,
+                        case_sensitive=case_sensitive,
+                    ),
+                )
+        elif name_pattern is None or fnmatch_name(
+            name, name_pattern, case_sensitive=case_sensitive,
+        ):
+            results.append((child, mtime))
+    return results
+
+
+def _apply_mtime_filters(
+    results: list[tuple[str, float]],
+    *,
+    newest: int | None,
+    oldest: int | None,
+) -> list[tuple[str, float]]:
     if newest is not None:
         results.sort(key=lambda item: item[1], reverse=True)
         return results[: int(newest)]
