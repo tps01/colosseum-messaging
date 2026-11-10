@@ -70,7 +70,12 @@ def exec(  # noqa: A001
 
 @measurement
 def measure_stdout(
-    *, ssh_id: int, command: str, key: str, timeout: float = 30.0, retries: int = 3,
+    *,
+    ssh_id: int,
+    command: str,
+    key: str,
+    timeout: float = 30.0,
+    retries: int = 3,
 ) -> str:
     """Run a remote command and record stdout (stripped).
 
@@ -136,7 +141,12 @@ def exec_sequence(
 
 @command
 def start(
-    *, ssh_id: int, command: str, key: str, timeout: float = 30.0, retries: int = 3,
+    *,
+    ssh_id: int,
+    command: str,
+    key: str,
+    timeout: float = 30.0,
+    retries: int = 3,
 ) -> None:
     """Start a remote command in the background; stdout/stderr stream to run artifacts.
 
@@ -165,7 +175,11 @@ def start(
 
 @measurement
 def collect(
-    *, ssh_id: int, key: str, timeout: float = 30.0, retries: int = 3,
+    *,
+    ssh_id: int,
+    key: str,
+    timeout: float = 30.0,
+    retries: int = 3,
 ) -> dict[str, object]:
     """Wait for a background command and record exit code plus stdout/stderr.
 
@@ -218,7 +232,10 @@ def put(
     _ = key
     _logger.info("Uploading %s to %s on SSH %s", local, remote, ssh_id)
     get_ssh_client(ssh_id, retries=retries).sftp_put(
-        local, remote, recursive=recursive, max_depth=max_depth,
+        local,
+        remote,
+        recursive=recursive,
+        max_depth=max_depth,
     )
 
 
@@ -331,7 +348,12 @@ def remove(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
 
 @command
 def rename(
-    *, ssh_id: int, old: str, new: str, key: str = "", retries: int = 3,
+    *,
+    ssh_id: int,
+    old: str,
+    new: str,
+    key: str = "",
+    retries: int = 3,
 ) -> None:
     """Rename a remote path via SFTP.
 
@@ -353,7 +375,8 @@ def rename(
 
 
 def _lookup_ssh_measurement(
-    key: str, commands: tuple[str, ...],
+    key: str,
+    commands: tuple[str, ...],
 ) -> tuple[object | None, str | None]:
     """Return ``(value, error)`` for a unique SSH measurement key among ``commands``."""
     ctx = get_context()
@@ -366,8 +389,7 @@ def _lookup_ssh_measurement(
         return None, None
     if len(hits) > 1:
         return None, (
-            f"ambiguous SSH measurement key {key!r}: "
-            "matches multiple commands; use a distinct key per call"
+            f"ambiguous SSH measurement key {key!r}: " "matches multiple commands; use a distinct key per call"
         )
     return hits[0], None
 

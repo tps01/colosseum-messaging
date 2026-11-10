@@ -92,9 +92,7 @@ def get_zmq_client(zmq_id: int) -> ZmqClientWrapper:
         cache_prefix="messaging:zmq",
         wrapper_cls=ZmqClientWrapper,
         default_driver="zmq",
-        detail=lambda cfg: (
-            f"endpoint={cfg.get('endpoint')} socket={cfg.get('socket')}"
-        ),
+        detail=lambda cfg: (f"endpoint={cfg.get('endpoint')} socket={cfg.get('socket')}"),
     )
 
 

@@ -14,13 +14,15 @@ def test_close_all_isolates_failures_and_leaves_other_resources(monkeypatch):
     broken.close.side_effect = RuntimeError("close failed")
     healthy = Mock()
     unrelated = Mock()
-    ctx.resource_cache.update({
-        "messaging:http:1": broken,
-        "messaging:redis:1": healthy,
-        "messaging:ssh:1": object(),
-        "equipment:psu:1": unrelated,
-        "messaging:http-other:1": unrelated,
-    })
+    ctx.resource_cache.update(
+        {
+            "messaging:http:1": broken,
+            "messaging:redis:1": healthy,
+            "messaging:ssh:1": object(),
+            "equipment:psu:1": unrelated,
+            "messaging:http-other:1": unrelated,
+        }
+    )
 
     close_all()
     close_all()

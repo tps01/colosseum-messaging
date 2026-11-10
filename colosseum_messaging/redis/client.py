@@ -22,6 +22,7 @@ class _RedisPubSub(Protocol):
 
     def close(self) -> None: ...
 
+
 _logger = get_logger("colosseum.messaging.redis")
 _ALLOWED_DRIVERS = frozenset({"sim", "redis"})
 

@@ -37,7 +37,10 @@ class _PubSub:
 
 
 def _redis(
-    monkeypatch: pytest.MonkeyPatch, pubsub: _PubSub, *, subscribed: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    pubsub: _PubSub,
+    *,
+    subscribed: bool,
 ) -> RedisClientWrapper:
     monkeypatch.setattr("colosseum_messaging._receive.time.monotonic", pubsub.clock.monotonic)
     client = RedisClientWrapper.__new__(RedisClientWrapper)

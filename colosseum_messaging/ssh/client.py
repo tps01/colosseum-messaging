@@ -40,7 +40,10 @@ class _HostKeyError(paramiko.SSHException):
 
 class _RejectPolicy(paramiko.RejectPolicy):
     def missing_host_key(
-        self, client: paramiko.SSHClient, hostname: str, key: paramiko.PKey,
+        self,
+        client: paramiko.SSHClient,
+        hostname: str,
+        key: paramiko.PKey,
     ) -> NoReturn:
         _ = client, key
         raise _HostKeyError(f"SSH host key for {hostname} is not in known_hosts")
@@ -59,7 +62,9 @@ class _HostKeyStore(Protocol):
 
 
 def _store_trusts_key(
-    store: _HostKeyStore, host_id: str, key: paramiko.PKey,
+    store: _HostKeyStore,
+    host_id: str,
+    key: paramiko.PKey,
 ) -> bool | None:
     """Return True/False when ``host_id`` is present, or None when it is absent."""
     if store.lookup(host_id) is None:
@@ -103,8 +108,7 @@ class SSHClientWrapper:
         auth = str(config.get("auth", "auto")).strip().lower()
         if auth not in _ALLOWED_AUTH:
             raise ValueError(
-                f"messaging.ssh auth must be one of "
-                f"{sorted(a for a in _ALLOWED_AUTH if a)}, got {auth!r}",
+                f"messaging.ssh auth must be one of " f"{sorted(a for a in _ALLOWED_AUTH if a)}, got {auth!r}",
             )
         self._auth = auth or "auto"
         configured = str(config.get("platform", "")).strip().lower()
@@ -191,12 +195,17 @@ class SSHClientWrapper:
             except (OSError, EOFError, paramiko.SSHException) as exc:
                 # Local file/permission errors and permanent DNS errors are not transient.
                 if isinstance(exc, OSError) and not (
-                    isinstance(exc, (ConnectionError, TimeoutError,
-                                     paramiko.ssh_exception.NoValidConnectionsError))
-                    or exc.errno in {
-                        errno.ETIMEDOUT, errno.ECONNREFUSED, errno.ECONNRESET,
-                        errno.ECONNABORTED, errno.ENETUNREACH, errno.EHOSTUNREACH,
-                        errno.ENETDOWN, errno.EPIPE,
+                    isinstance(exc, (ConnectionError, TimeoutError, paramiko.ssh_exception.NoValidConnectionsError))
+                    or exc.errno
+                    in {
+                        errno.ETIMEDOUT,
+                        errno.ECONNREFUSED,
+                        errno.ECONNRESET,
+                        errno.ECONNABORTED,
+                        errno.ENETUNREACH,
+                        errno.EHOSTUNREACH,
+                        errno.ENETDOWN,
+                        errno.EPIPE,
                     }
                     or (isinstance(exc, socket.gaierror) and exc.errno == socket.EAI_AGAIN)
                 ):
@@ -205,7 +214,9 @@ class SSHClientWrapper:
                     raise
                 _logger.warning(
                     "SSH connection attempt %d/%d failed (%s); retrying",
-                    attempt, attempts, type(exc).__name__,
+                    attempt,
+                    attempts,
+                    type(exc).__name__,
                 )
             else:
                 return
@@ -402,14 +413,12 @@ class SSHClientWrapper:
         if suffix == "":
             if platform == "windows":
                 raise MessagingCapabilityError(
-                    "exec_sequence on Windows requires interpreter= "
-                    "(Linux-first SSH; see README)",
+                    "exec_sequence on Windows requires interpreter= " "(Linux-first SSH; see README)",
                 )
             return {"mode": "stdin", "command": "bash -s"}
         if platform == "windows":
             raise MessagingCapabilityError(
-                f"exec_sequence suffix {suffix!r} on Windows requires interpreter= "
-                "(Linux-first SSH; see README)",
+                f"exec_sequence suffix {suffix!r} on Windows requires interpreter= " "(Linux-first SSH; see README)",
             )
         return {"mode": "stdin", "command": "bash -s"}
 
@@ -504,9 +513,7 @@ class SSHClientWrapper:
         if job is None:
             raise KeyError(f"No background SSH job for key {key!r}")
 
-        if job.abandoned or (
-            not job.done.wait(timeout=timeout) and not job.done.is_set()
-        ):
+        if job.abandoned or (not job.done.wait(timeout=timeout) and not job.done.is_set()):
             job.abandoned = True
             if job.channel is not None:
                 job.channel.close()
@@ -517,16 +524,8 @@ class SSHClientWrapper:
             job.abandoned = True
             raise TimeoutError(f"SSH job {key!r} did not complete within {timeout}s")
 
-        stdout_text = (
-            job.stdout_path.read_text(encoding="utf-8", errors="replace")
-            if job.stdout_path.exists()
-            else ""
-        )
-        stderr_text = (
-            job.stderr_path.read_text(encoding="utf-8", errors="replace")
-            if job.stderr_path.exists()
-            else ""
-        )
+        stdout_text = job.stdout_path.read_text(encoding="utf-8", errors="replace") if job.stdout_path.exists() else ""
+        stderr_text = job.stderr_path.read_text(encoding="utf-8", errors="replace") if job.stderr_path.exists() else ""
         return {
             "exit_code": int(job.exit_code),
             "stdout": stdout_text,
@@ -588,9 +587,14 @@ class SSHClientWrapper:
         recursive: bool = False,
         max_depth: int | None = None,
     ) -> list[str]:
-        selected = [(path, mtime) for path, mtime in select_local_files(
-            local, recursive=recursive, max_depth=max_depth,
-        )]
+        selected = [
+            (path, mtime)
+            for path, mtime in select_local_files(
+                local,
+                recursive=recursive,
+                max_depth=max_depth,
+            )
+        ]
         mappings = map_local_put_paths(
             [path for path, _mtime in selected],
             local,

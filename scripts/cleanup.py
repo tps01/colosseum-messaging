@@ -214,6 +214,7 @@ def _remove(path: Path, *, dry_run: bool) -> None:
     if dry_run:
         return
     if path.is_dir() and not path.is_symlink():
+
         def _onerror(func: object, name: str, _exc_info: object) -> None:
             # Clear read-only bits that commonly block rmtree on Windows checkouts.
             try:
@@ -247,10 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--keep-venvs",
         action="store_true",
-        help=(
-            "Keep top-level .venv/, .venv-*/, venv/, venv-*/, env/ "
-            "(only scrub cache files inside)"
-        ),
+        help=("Keep top-level .venv/, .venv-*/, venv/, venv-*/, env/ " "(only scrub cache files inside)"),
     )
     args = parser.parse_args(argv)
     root = _repo_root()

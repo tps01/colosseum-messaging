@@ -31,10 +31,7 @@ def test_complete_runtime_dependencies_are_installed_by_default() -> None:
 
 def test_plugin_entry_points_and_version_match_metadata() -> None:
     metadata = distribution("colosseum-messaging")
-    entry_points = {
-        (entry_point.group, entry_point.name): entry_point.value
-        for entry_point in metadata.entry_points
-    }
+    entry_points = {(entry_point.group, entry_point.name): entry_point.value for entry_point in metadata.entry_points}
 
     assert entry_points[("colosseum.plugins", "messaging")] == "colosseum_messaging:register"
     assert colosseum_messaging.__version__ == metadata.version

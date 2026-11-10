@@ -51,7 +51,9 @@ class ZmqClientWrapper:
             if self._socket_kind == "sub":
                 self._mailbox_token = SIM_MAILBOX.subscribe(self._endpoint)
             _logger.debug(
-                "ZMQ client sim mode endpoint=%s socket=%s", self._endpoint, self._socket_kind,
+                "ZMQ client sim mode endpoint=%s socket=%s",
+                self._endpoint,
+                self._socket_kind,
             )
             return
         self._context = zmq.Context.instance()

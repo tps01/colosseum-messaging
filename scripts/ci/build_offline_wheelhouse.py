@@ -63,8 +63,7 @@ def _linux_cpu_arch() -> str:
     if machine in {"aarch64", "arm64"}:
         return "aarch64"
     raise SystemExit(
-        f"Unsupported Linux machine={platform.machine()!r}; "
-        "expected x86_64/amd64 or aarch64/arm64",
+        f"Unsupported Linux machine={platform.machine()!r}; " "expected x86_64/amd64 or aarch64/arm64",
     )
 
 
@@ -171,11 +170,11 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
                 "set -euo pipefail",
                 'ROOT="$(cd "$(dirname "$0")" && pwd)"',
                 'cd "$ROOT"',
-                'if [[ ! -d .venv ]]; then',
+                "if [[ ! -d .venv ]]; then",
                 '  echo "Creating virtual environment .venv ..."',
                 "  python3 -m venv .venv",
                 "fi",
-                '# shellcheck disable=SC1091',
+                "# shellcheck disable=SC1091",
                 'source "$ROOT/.venv/bin/activate"',
                 "python -m pip install --upgrade pip",
                 f'python -m pip install --no-index --find-links="$ROOT/wheels" {pkg_list}',
@@ -217,7 +216,7 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
                 '  echo "Run ./install.sh first." >&2',
                 "  exit 1",
                 "fi",
-                '# shellcheck disable=SC1091',
+                "# shellcheck disable=SC1091",
                 'source "$ROOT/.venv/bin/activate"',
                 'echo "Colosseum CLI environment active. Try: colosseum --help"',
                 'exec "${SHELL:-bash}" -i',
@@ -254,7 +253,7 @@ def _write_bundle_scripts(wheelhouse: Path, packages: list[str]) -> None:
                 '  echo "Run ./install.sh first." >&2',
                 "  exit 1",
                 "fi",
-                '# shellcheck disable=SC1091',
+                "# shellcheck disable=SC1091",
                 'source "$ROOT/.venv/bin/activate"',
                 "exec colosseum --gui",
                 "",
@@ -295,18 +294,12 @@ def main(argv: list[str] | None = None) -> int:
         "--zip",
         dest="archive",
         action="store_true",
-        help=(
-            "Write an archive next to the wheelhouse "
-            "(Windows: .zip; Linux/macOS: .tar.gz). --zip is an alias."
-        ),
+        help=("Write an archive next to the wheelhouse " "(Windows: .zip; Linux/macOS: .tar.gz). --zip is an alias."),
     )
     parser.add_argument(
         "--os-label",
         default=None,
-        help=(
-            "OS token in archive name "
-            "(default: windows / linux-x86_64 / linux-aarch64 / macos)"
-        ),
+        help=("OS token in archive name " "(default: windows / linux-x86_64 / linux-aarch64 / macos)"),
     )
     parser.add_argument(
         "--archive-dir",

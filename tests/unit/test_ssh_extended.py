@@ -12,12 +12,7 @@ from colosseum_messaging.ssh.client import SSHClientWrapper
 
 @pytest.fixture
 def sim_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SSHClientWrapper:
-    config_path = (
-        Path(__file__).resolve().parents[2]
-        / "examples"
-        / "configs"
-        / "config.messaging.sim.toml"
-    )
+    config_path = Path(__file__).resolve().parents[2] / "examples" / "configs" / "config.messaging.sim.toml"
     monkeypatch.chdir(tmp_path)
     load_config(config_path)
     return SSHClientWrapper({"driver": "sim", "host": "sim.local", "username": "pi"})

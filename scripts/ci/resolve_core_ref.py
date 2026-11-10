@@ -76,8 +76,7 @@ def _list_core_tags() -> list[str]:
     )
     if proc.returncode != 0:
         raise SystemExit(
-            "gh release list failed for tps01/colosseum-core:\n"
-            f"{proc.stderr.strip() or proc.stdout.strip()}",
+            "gh release list failed for tps01/colosseum-core:\n" f"{proc.stderr.strip() or proc.stdout.strip()}",
         )
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
@@ -99,8 +98,7 @@ def _newest_satisfying_tag(tags: list[str], specifier: str) -> str:
             candidates.append((ver, tag))
     if not candidates:
         raise SystemExit(
-            f"No tps01/colosseum-core release tag satisfies {specifier!r} "
-            f"(saw {len(tags)} tags)",
+            f"No tps01/colosseum-core release tag satisfies {specifier!r} " f"(saw {len(tags)} tags)",
         )
     candidates.sort(key=lambda item: item[0])
     return candidates[-1][1]
