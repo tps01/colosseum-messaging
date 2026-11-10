@@ -39,7 +39,7 @@ class _PubSub:
 def _redis(
     monkeypatch: pytest.MonkeyPatch, pubsub: _PubSub, *, subscribed: bool,
 ) -> RedisClientWrapper:
-    monkeypatch.setattr("colosseum_messaging.redis.client.time.monotonic", pubsub.clock.monotonic)
+    monkeypatch.setattr("colosseum_messaging._receive.time.monotonic", pubsub.clock.monotonic)
     client = RedisClientWrapper.__new__(RedisClientWrapper)
     client._sim = False
     client._client = object()
@@ -59,7 +59,7 @@ def test_redis_receive_skips_subscription_acknowledgement(monkeypatch: pytest.Mo
         def pubsub(self, *, ignore_subscribe_messages: bool = True) -> _PubSub:
             return pubsub
 
-    monkeypatch.setattr("colosseum_messaging.redis.client.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("colosseum_messaging._receive.time.monotonic", clock.monotonic)
     client = RedisClientWrapper.__new__(RedisClientWrapper)
     client._sim = False
     client._client = _Conn()

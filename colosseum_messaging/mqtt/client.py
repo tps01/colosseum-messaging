@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import queue
-import time
 import uuid
 from typing import TYPE_CHECKING
 
@@ -9,6 +8,7 @@ import paho.mqtt.client as mqtt
 from colosseum.logging import get_logger
 
 from colosseum_messaging._pump import PumpHandle, topic_payload
+from colosseum_messaging._receive import deadline_poll, sim_receive_matching
 from colosseum_messaging.sim import SIM_MAILBOX
 
 if TYPE_CHECKING:
@@ -95,50 +95,44 @@ class MqttClientWrapper:
     def _receive(self, timeout: float = 1.0, topic: str | None = None) -> dict[str, str]:
         subscribe_topic = self._topic if topic is None else topic
         _logger.debug("MQTT RECEIVE topic=%s timeout=%ss", subscribe_topic, timeout)
+        timeout_message = f"No MQTT message on {subscribe_topic!r} within {timeout}s"
         if self._sim:
             if self._mailbox_token is None:
                 raise RuntimeError("MQTT sim client is not registered")
-            deadline = time.monotonic() + timeout
-            while True:
-                remaining = max(0.0, deadline - time.monotonic())
-                item = SIM_MAILBOX.receive(self._mailbox_token, remaining)
-                if item is None:
-                    raise TimeoutError(
-                        f"No MQTT message on {subscribe_topic!r} within {timeout}s",
-                    )
-                msg_topic, payload = item
-                if _topic_matches(subscribe_topic, msg_topic):
-                    return {"topic": msg_topic, "payload": payload}
-                if remaining <= 0:
-                    raise TimeoutError(
-                        f"No MQTT message on {subscribe_topic!r} within {timeout}s",
-                    )
+            return sim_receive_matching(
+                self._mailbox_token,
+                timeout,
+                matches=lambda msg_topic, _payload: _topic_matches(subscribe_topic, msg_topic),
+                timeout_message=timeout_message,
+            )
 
+        self._ensure_subscribed(subscribe_topic)
+
+        def poll(remaining: float) -> tuple[str, str]:
+            try:
+                return self._incoming.get(timeout=remaining)
+            except queue.Empty as exc:
+                raise TimeoutError(timeout_message) from exc
+
+        msg_topic, payload = deadline_poll(
+            timeout,
+            poll=poll,
+            accept=lambda item: _topic_matches(subscribe_topic, item[0]),
+            timeout_message=timeout_message,
+        )
+        return {"topic": msg_topic, "payload": payload}
+
+    def _ensure_subscribed(self, subscribe_topic: str) -> None:
         if self._client is None:
             raise RuntimeError("MQTT client is not connected")
-        if self._subscribed_topic != subscribe_topic:
-            if self._subscribed_topic is not None:
-                self._client.unsubscribe(self._subscribed_topic)
-            result, _mid = self._client.subscribe(subscribe_topic)
-            if result != mqtt.MQTT_ERR_SUCCESS:
-                raise RuntimeError(f"MQTT subscribe failed with rc={result}")
-            self._subscribed_topic = subscribe_topic
-
-        deadline = time.monotonic() + timeout
-        while True:
-            remaining = max(0.0, deadline - time.monotonic())
-            if remaining <= 0:
-                raise TimeoutError(
-                    f"No MQTT message on {subscribe_topic!r} within {timeout}s",
-                )
-            try:
-                msg_topic, payload = self._incoming.get(timeout=remaining)
-            except queue.Empty as exc:
-                raise TimeoutError(
-                    f"No MQTT message on {subscribe_topic!r} within {timeout}s",
-                ) from exc
-            if _topic_matches(subscribe_topic, msg_topic):
-                return {"topic": msg_topic, "payload": payload}
+        if self._subscribed_topic == subscribe_topic:
+            return
+        if self._subscribed_topic is not None:
+            self._client.unsubscribe(self._subscribed_topic)
+        result, _mid = self._client.subscribe(subscribe_topic)
+        if result != mqtt.MQTT_ERR_SUCCESS:
+            raise RuntimeError(f"MQTT subscribe failed with rc={result}")
+        self._subscribed_topic = subscribe_topic
 
     def start_listen(self, on_message: Hook, topic: str | None = None) -> None:
         def poll(timeout: float) -> dict[str, str] | None:

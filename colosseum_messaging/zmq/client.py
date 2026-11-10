@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING
 
 from colosseum.logging import get_logger
 
 import zmq
 from colosseum_messaging._pump import PumpHandle, topic_payload
+from colosseum_messaging._receive import sim_receive_matching
 from colosseum_messaging.sim import SIM_MAILBOX
 
 if TYPE_CHECKING:
@@ -94,31 +94,26 @@ class ZmqClientWrapper:
         if self._socket_kind != "sub":
             raise RuntimeError("ZMQ receive requires socket='sub'")
         _logger.debug("ZMQ RECEIVE endpoint=%s timeout=%ss", self._endpoint, timeout)
+        timeout_message = f"No ZMQ message on {self._endpoint!r} within {timeout}s"
         if self._sim:
             if self._mailbox_token is None:
                 raise RuntimeError("ZMQ sim subscriber is not registered")
-            deadline = time.monotonic() + timeout
-            while True:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(
-                        f"No ZMQ message on {self._endpoint!r} within {timeout}s",
-                    )
-                item = SIM_MAILBOX.receive(self._mailbox_token, remaining)
-                if item is None:
-                    raise TimeoutError(
-                        f"No ZMQ message on {self._endpoint!r} within {timeout}s",
-                    )
-                topic, payload = item
-                if topic.startswith(self._topic):
-                    return {"topic": topic, "payload": payload}
+            return sim_receive_matching(
+                self._mailbox_token,
+                timeout,
+                matches=lambda topic, _payload: topic.startswith(self._topic),
+                timeout_message=timeout_message,
+            )
+        return self._receive_live(timeout, timeout_message)
+
+    def _receive_live(self, timeout: float, timeout_message: str) -> dict[str, str]:
         if self._socket is None:
             raise RuntimeError("ZMQ socket is not connected")
         self._socket.setsockopt(zmq.RCVTIMEO, int(max(timeout, 0.0) * 1000))
         try:
             frames = self._socket.recv_multipart()
         except zmq.Again as exc:
-            raise TimeoutError(f"No ZMQ message on {self._endpoint!r} within {timeout}s") from exc
+            raise TimeoutError(timeout_message) from exc
         if len(frames) >= 2:
             topic = frames[0].decode("utf-8", errors="replace")
             payload = frames[1].decode("utf-8", errors="replace")
