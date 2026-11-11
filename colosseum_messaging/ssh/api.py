@@ -11,8 +11,11 @@ from colosseum.decorators import (
     missing_measurement_result,
     verification,
 )
+from colosseum.logging import get_logger
 
 from colosseum_messaging.connections import get_ssh_client
+
+_logger = get_logger("colosseum.messaging")
 
 _SSH_EXEC_COMMANDS = (
     "ssh.exec",
@@ -56,6 +59,7 @@ def exec(  # noqa: A001
         explicit verify_exit check.
     """
     _ = key
+    _logger.info("Running command on SSH %s: %s", ssh_id, command)
     return get_ssh_client(ssh_id, retries=retries).exec(
         command,
         timeout=timeout,
@@ -66,7 +70,12 @@ def exec(  # noqa: A001
 
 @measurement
 def measure_stdout(
-    *, ssh_id: int, command: str, key: str, timeout: float = 30.0, retries: int = 3,
+    *,
+    ssh_id: int,
+    command: str,
+    key: str,
+    timeout: float = 30.0,
+    retries: int = 3,
 ) -> str:
     """Run a remote command and record stdout (stripped).
 
@@ -85,6 +94,7 @@ def measure_stdout(
     :returns: Stripped remote stdout text, recorded as measurement evidence.
     """
     _ = key
+    _logger.info("Measuring stdout on SSH %s: %s", ssh_id, command)
     return get_ssh_client(ssh_id, retries=retries).exec_stdout(command, timeout=timeout)
 
 
@@ -120,6 +130,7 @@ def exec_sequence(
         explicit verify_exit check.
     """
     _ = key
+    _logger.info("Running script on SSH %s: %s", ssh_id, path or "inline")
     return get_ssh_client(ssh_id, retries=retries).exec_sequence(
         path=path,
         script=script,
@@ -130,7 +141,12 @@ def exec_sequence(
 
 @command
 def start(
-    *, ssh_id: int, command: str, key: str, timeout: float = 30.0, retries: int = 3,
+    *,
+    ssh_id: int,
+    command: str,
+    key: str,
+    timeout: float = 30.0,
+    retries: int = 3,
 ) -> None:
     """Start a remote command in the background; stdout/stderr stream to run artifacts.
 
@@ -153,12 +169,17 @@ def start(
     See the SSH workflow guide for timeouts and output-file lifetime.
     """
     _ = key
+    _logger.info("Starting background command on SSH %s: %s", ssh_id, command)
     get_ssh_client(ssh_id, retries=retries).start(command, key, timeout=timeout)
 
 
 @measurement
 def collect(
-    *, ssh_id: int, key: str, timeout: float = 30.0, retries: int = 3,
+    *,
+    ssh_id: int,
+    key: str,
+    timeout: float = 30.0,
+    retries: int = 3,
 ) -> dict[str, object]:
     """Wait for a background command and record exit code plus stdout/stderr.
 
@@ -176,6 +197,7 @@ def collect(
         explicit verify_exit check.
     """
     _ = key
+    _logger.info("Collecting background command %s on SSH %s", key, ssh_id)
     return get_ssh_client(ssh_id, retries=retries).collect(key, timeout=timeout)
 
 
@@ -208,8 +230,12 @@ def put(
     :returns: None; the command outcome is recorded.
     """
     _ = key
+    _logger.info("Uploading %s to %s on SSH %s", local, remote, ssh_id)
     get_ssh_client(ssh_id, retries=retries).sftp_put(
-        local, remote, recursive=recursive, max_depth=max_depth,
+        local,
+        remote,
+        recursive=recursive,
+        max_depth=max_depth,
     )
 
 
@@ -249,6 +275,7 @@ def get(
     :returns: List of saved local download paths, recorded as measurement evidence.
     """
     _ = key
+    _logger.info("Downloading %s to %s on SSH %s", remote, local, ssh_id)
     return get_ssh_client(ssh_id, retries=retries).sftp_get(
         remote,
         local,
@@ -275,6 +302,7 @@ def listdir(*, ssh_id: int, path: str, key: str, retries: int = 3) -> list[str]:
     :returns: Returned value described above, recorded as evidence for decorated measurements.
     """
     _ = key
+    _logger.info("Listing %s on SSH %s", path, ssh_id)
     return get_ssh_client(ssh_id, retries=retries).sftp_listdir(path)
 
 
@@ -294,6 +322,7 @@ def mkdir(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
     :returns: None; the command outcome is recorded.
     """
     _ = key
+    _logger.info("Creating directory %s on SSH %s", path, ssh_id)
     get_ssh_client(ssh_id, retries=retries).sftp_mkdir(path)
 
 
@@ -313,12 +342,18 @@ def remove(*, ssh_id: int, path: str, key: str = "", retries: int = 3) -> None:
     :returns: None; the command outcome is recorded.
     """
     _ = key
+    _logger.info("Removing %s on SSH %s", path, ssh_id)
     get_ssh_client(ssh_id, retries=retries).sftp_remove(path)
 
 
 @command
 def rename(
-    *, ssh_id: int, old: str, new: str, key: str = "", retries: int = 3,
+    *,
+    ssh_id: int,
+    old: str,
+    new: str,
+    key: str = "",
+    retries: int = 3,
 ) -> None:
     """Rename a remote path via SFTP.
 
@@ -335,11 +370,13 @@ def rename(
     :returns: None; the command outcome is recorded.
     """
     _ = key
+    _logger.info("Renaming %s to %s on SSH %s", old, new, ssh_id)
     get_ssh_client(ssh_id, retries=retries).sftp_rename(old, new)
 
 
 def _lookup_ssh_measurement(
-    key: str, commands: tuple[str, ...],
+    key: str,
+    commands: tuple[str, ...],
 ) -> tuple[object | None, str | None]:
     """Return ``(value, error)`` for a unique SSH measurement key among ``commands``."""
     ctx = get_context()
@@ -352,8 +389,7 @@ def _lookup_ssh_measurement(
         return None, None
     if len(hits) > 1:
         return None, (
-            f"ambiguous SSH measurement key {key!r}: "
-            "matches multiple commands; use a distinct key per call"
+            f"ambiguous SSH measurement key {key!r}: matches multiple commands; use a distinct key per call"
         )
     return hits[0], None
 
@@ -374,6 +410,7 @@ def verify_exit(*, key: str, expected: int = 0, optional: bool = False) -> Verif
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying SSH exit code for %s expects %s", key, expected)
     value, ambiguity = _lookup_ssh_measurement(key, _SSH_EXEC_COMMANDS)
     if ambiguity is not None:
         return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
@@ -417,6 +454,7 @@ def verify_stdout_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying SSH stdout for key %s", key)
     value, ambiguity = _lookup_ssh_measurement(key, _SSH_STDOUT_COMMANDS)
     if ambiguity is not None:
         return VerificationResult(status="ERROR", message=ambiguity, optional=optional)

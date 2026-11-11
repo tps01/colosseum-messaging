@@ -7,3 +7,10 @@ vulture>=2.11
 ruff>=0.8
 mypy>=1.11
 types-paramiko
+black>=24.10
+
+# Optional engine on the supported fuzzing platform (Apache-2.0).
+atheris>=3.1.0; sys_platform == "linux" and platform_machine == "x86_64" and python_version == "3.12"
+
+# Manual fuzz seed line/branch reports (Apache-2.0).
+coverage>=7.6

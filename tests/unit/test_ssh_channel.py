@@ -229,14 +229,20 @@ class _Exec:
         self._channels = list(channels)
 
     def exec_command(
-        self, _command: str, timeout: float | None = None, *, get_pty: bool = False,
+        self,
+        _command: str,
+        timeout: float | None = None,
+        *,
+        get_pty: bool = False,
     ):
         channel = self._channels.pop(0)
         return object(), _Stream(channel), _Stream(channel)
 
 
 def _live(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, channels: list[object],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    channels: list[object],
 ) -> SSHClientWrapper:
     monkeypatch.setattr(
         "colosseum_messaging.ssh.client.resolve_artifact_path",
@@ -307,7 +313,8 @@ def test_drain_times_out_when_no_status_arrives() -> None:
 
 
 def test_immediate_completion_keeps_real_exit_status(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     holder: dict[str, object] = {}
     zero = _Finished(0, b"ok\n", holder, "zero")
@@ -328,7 +335,8 @@ def test_immediate_completion_keeps_real_exit_status(
 
 
 def test_collect_timeout_does_not_report_exit_zero(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     channel = _Hangs()
     client = _live(tmp_path, monkeypatch, [channel])
@@ -344,7 +352,8 @@ def test_collect_timeout_does_not_report_exit_zero(
 
 
 def test_reader_failure_is_not_success(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = _live(tmp_path, monkeypatch, [_Broken()])
     client.start("boom", "bad")
@@ -396,7 +405,8 @@ def _delivery_client(platform: str) -> SSHClientWrapper:
 
 
 def test_windows_upload_keeps_ps1_suffix_and_quotes_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     script = tmp_path / "job.ps1"
     script.write_text("Write-Output ready\n", encoding="utf-8")
@@ -404,7 +414,9 @@ def test_windows_upload_keeps_ps1_suffix_and_quotes_path(
     commands: list[str] = []
 
     def _exec(
-        command: str, timeout: float = 30.0, input_data: bytes | None = None,
+        command: str,
+        timeout: float = 30.0,
+        input_data: bytes | None = None,
     ) -> dict[str, object]:
         commands.append(command)
         return {"exit_code": 0, "stdout": "", "stderr": ""}
@@ -422,14 +434,17 @@ def test_windows_upload_keeps_ps1_suffix_and_quotes_path(
 
 
 def test_upload_quotes_spaced_temp_dir_and_removes_the_same_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     script = tmp_path / "job.sh"
     script.write_text("echo hi\n", encoding="utf-8")
     sftp = _SFTP("/home/tester/My Files")
 
     def _exec(
-        command: str, timeout: float = 30.0, input_data: bytes | None = None,
+        command: str,
+        timeout: float = 30.0,
+        input_data: bytes | None = None,
     ) -> dict[str, object]:
         raise RuntimeError(command)
 
@@ -445,7 +460,8 @@ def test_upload_quotes_spaced_temp_dir_and_removes_the_same_file(
 
 
 def test_upload_falls_back_to_tmp_when_home_cannot_be_resolved(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     script = tmp_path / "job.bat"
     script.write_text("echo hi\n", encoding="utf-8")
@@ -453,7 +469,9 @@ def test_upload_falls_back_to_tmp_when_home_cannot_be_resolved(
     commands: list[str] = []
 
     def _exec(
-        command: str, timeout: float = 30.0, input_data: bytes | None = None,
+        command: str,
+        timeout: float = 30.0,
+        input_data: bytes | None = None,
     ) -> dict[str, object]:
         commands.append(command)
         return {"exit_code": 0, "stdout": "", "stderr": ""}

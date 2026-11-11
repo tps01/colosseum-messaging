@@ -10,11 +10,14 @@ from colosseum.decorators import (
     missing_measurement_result,
     verification,
 )
+from colosseum.logging import get_logger
 
 from colosseum_messaging.connections import get_http_client
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+_logger = get_logger("colosseum.messaging")
 
 _HTTP_COMMANDS = (
     "http.get",
@@ -30,13 +33,11 @@ def _request(
     http_id: int,
     method: str,
     path: str,
-    key: str,
     json_body: object = None,
     data: bytes | str | None = None,
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> dict[str, object]:
-    _ = key
     return get_http_client(http_id).request(
         method,
         path,
@@ -72,11 +73,12 @@ def request(
 
     :returns: ``{"status_code": int, "body": str, "headers": dict}``.
     """
+    _ = key
+    _logger.info("%s HTTP %s %s", http_id, method, path)
     return _request(
         http_id=http_id,
         method=method,
         path=path,
-        key=key,
         json_body=json,
         data=data,
         headers=headers,
@@ -107,11 +109,12 @@ def get(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
+    _logger.info("%s HTTP GET %s", http_id, path)
     return _request(
         http_id=http_id,
         method="GET",
         path=path,
-        key=key,
         headers=headers,
         timeout=timeout,
     )
@@ -146,11 +149,12 @@ def post(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
+    _logger.info("%s HTTP POST %s", http_id, path)
     return _request(
         http_id=http_id,
         method="POST",
         path=path,
-        key=key,
         json_body=json,
         data=data,
         headers=headers,
@@ -187,11 +191,12 @@ def put(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
+    _logger.info("%s HTTP PUT %s", http_id, path)
     return _request(
         http_id=http_id,
         method="PUT",
         path=path,
-        key=key,
         json_body=json,
         data=data,
         headers=headers,
@@ -222,11 +227,12 @@ def delete(
     :returns: Response dictionary with integer status_code and decoded text body; error HTTP
         statuses are still recorded responses.
     """
+    _ = key
+    _logger.info("%s HTTP DELETE %s", http_id, path)
     return _request(
         http_id=http_id,
         method="DELETE",
         path=path,
-        key=key,
         headers=headers,
         timeout=timeout,
     )
@@ -248,8 +254,7 @@ def _lookup_http_measurement(key: str) -> tuple[object | None, str | None]:
         return None, None
     if len(hits) > 1:
         return None, (
-            f"ambiguous HTTP measurement key {key!r}: "
-            "matches multiple methods; use a distinct key per request"
+            f"ambiguous HTTP measurement key {key!r}: matches multiple methods; use a distinct key per request"
         )
     return hits[0], None
 
@@ -276,6 +281,7 @@ def verify_status(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying HTTP status %s for key %s", expected, key)
     value, ambiguity = _lookup_http_measurement(key)
     if ambiguity is not None:
         return VerificationResult(status="ERROR", message=ambiguity, optional=optional)
@@ -319,6 +325,7 @@ def verify_body_match(
     :returns: Recorded verification outcome (PASS, FAIL, ERROR, or BLOCKED), including the
         actual value when available.
     """
+    _logger.info("Verifying HTTP body for key %s", key)
     value, ambiguity = _lookup_http_measurement(key)
     if ambiguity is not None:
         return VerificationResult(status="ERROR", message=ambiguity, optional=optional)

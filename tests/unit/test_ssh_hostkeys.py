@@ -47,7 +47,8 @@ def test_auth_none_trusts_explicit_known_hosts_file(tmp_path: Path) -> None:
 
 
 def test_auth_none_trusts_system_host_key_store(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     key = _public_host_key()
     known_hosts = tmp_path / "system_known_hosts"
@@ -69,7 +70,8 @@ def test_auth_none_rejects_unknown_host_key(tmp_path: Path) -> None:
 
 
 def test_auth_none_rejects_mismatched_file_and_system_keys(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     trusted = _public_host_key()
     presented = _public_host_key()
@@ -92,15 +94,21 @@ def test_auth_none_rejects_mismatched_file_and_system_keys(
 @pytest.mark.parametrize("store", ["system", "missing", "empty", "known", "other_host"])
 @pytest.mark.parametrize("port", [22, 2222])
 def test_auth_auto_reaches_login_for_known_and_new_hosts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, store: str, port: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    store: str,
+    port: int,
 ) -> None:
     from unittest.mock import Mock
 
     key = _public_host_key()
     host_id = "bench.example" if port == 22 else f"[bench.example]:{port}"
     config = {
-        "host": "bench.example", "port": port, "username": "u",
-        "password": "password", "auth": "auto",
+        "host": "bench.example",
+        "port": port,
+        "username": "u",
+        "password": "password",
+        "auth": "auto",
     }
     known_hosts = tmp_path / "ssh" / "known_hosts"
     if store != "system":

@@ -23,16 +23,15 @@ TITLE = "Colosseum Messaging"
 SLUG = "messaging"
 # (rst_stem, import_module, displayed col.* path)
 API_MODULES: tuple[tuple[str, str, str], ...] = (
-    ('http', 'colosseum_messaging.http.api', 'col.messaging.http'),
-    ('redis', 'colosseum_messaging.redis.api', 'col.messaging.redis'),
-    ('zmq', 'colosseum_messaging.zmq.api', 'col.messaging.zmq'),
-    ('mqtt', 'colosseum_messaging.mqtt.api', 'col.messaging.mqtt'),
-    ('ssh', 'colosseum_messaging.ssh.api', 'col.messaging.ssh'),
-    ('scp', 'colosseum_messaging.scp.api', 'col.messaging.scp'),
+    ("http", "colosseum_messaging.http.api", "col.messaging.http"),
+    ("redis", "colosseum_messaging.redis.api", "col.messaging.redis"),
+    ("zmq", "colosseum_messaging.zmq.api", "col.messaging.zmq"),
+    ("mqtt", "colosseum_messaging.mqtt.api", "col.messaging.mqtt"),
+    ("ssh", "colosseum_messaging.ssh.api", "col.messaging.ssh"),
+    ("scp", "colosseum_messaging.scp.api", "col.messaging.scp"),
 )
 # Optional single-function pages: (rst_stem, "module:qualname", displayed name)
-API_FUNCTIONS: tuple[tuple[str, str, str], ...] = (
-)
+API_FUNCTIONS: tuple[tuple[str, str, str], ...] = ()
 GUIDES: tuple[str, ...] = (
     "docs/sphinx/source/guides/http.rst",
     "docs/sphinx/source/guides/pubsub.rst",
@@ -43,9 +42,7 @@ GUIDES: tuple[str, ...] = (
     "docs/sphinx/source/guides/getting_started.rst",
     "docs/sphinx/source/guides/protocol_workflows.rst",
 )
-CONFIG_REFERENCE: tuple[str, ...] = (
-    "docs/sphinx/source/config_reference.rst",
-)
+CONFIG_REFERENCE: tuple[str, ...] = ("docs/sphinx/source/config_reference.rst",)
 CONFIG_PACKAGE = "colosseum_messaging"
 # --- end per-plugin constants ---
 
@@ -154,6 +151,10 @@ def _document_controls(app, what, name, obj, options, lines):
             "Verification label in summaries and reports; omitted or blank "
             "uses the evidence key."
         ),
+        "requirements": (
+            "Requirement identifiers attached to this verification. "
+            "A comma-separated string or a list; omitted attaches none."
+        ),
     }}
     for parameter, description in controls.items():
         if (
@@ -218,19 +219,18 @@ def _write_index(
     config_names: list[str],
 ) -> None:
     lines = [
-        TITLE, "=" * len(TITLE), "",
+        TITLE,
+        "=" * len(TITLE),
+        "",
         (
             "Send HTTP requests, exchange Redis/ZMQ/MQTT messages, execute "
             "SSH commands, and transfer files with ``col.messaging.*``."
         ),
         "",
-        f"`Colosseum core documentation hub <{HUB_URL}>`__", "",
+        f"`Colosseum core documentation hub <{HUB_URL}>`__",
+        "",
     ]
-    development = [
-        name
-        for name in guide_names
-        if name.endswith(("/development", "/driver-documentation-requests"))
-    ]
+    development = [name for name in guide_names if name.endswith(("/development", "/driver-documentation-requests"))]
     learning = [name for name in guide_names if name not in development]
     learning.sort(
         key=lambda name: (
@@ -247,8 +247,7 @@ def _write_index(
     )
     for caption, names in sections:
         if names:
-            lines.extend([".. toctree::", "   :maxdepth: 1", "   :titlesonly:",
-                          f"   :caption: {caption}", ""])
+            lines.extend([".. toctree::", "   :maxdepth: 1", "   :titlesonly:", f"   :caption: {caption}", ""])
             lines.extend(f"   {name}" for name in names)
             lines.append("")
     (SITE_SOURCE / "index.rst").write_text("\n".join(lines), encoding="utf-8")
@@ -326,10 +325,7 @@ def stage() -> None:
         ast.literal_eval(node.value)
         for node in tree.body
         if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
-        )
+        and any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets)
     )
     documented = {path.rsplit(".", 1)[-1] for _, _, path in (*API_MODULES, *API_FUNCTIONS)}
     missing = set(exported) - documented

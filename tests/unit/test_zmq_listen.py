@@ -103,7 +103,9 @@ def test_verify_listen_passes_a_clean_stream(tmp_path) -> None:
     finally:
         col.messaging.zmq.stop_listen(zmq_id=2, key="status")
     result = col.messaging.zmq.verify_listen(
-        key="status", max_silence_s=2.0, min_received=1,
+        key="status",
+        max_silence_s=2.0,
+        min_received=1,
     )
     assert result.status == "PASS"
     assert result.actual["received"] == 2

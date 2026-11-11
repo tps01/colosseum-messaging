@@ -85,3 +85,6 @@ wheelhouse/
 offline-bundle/
 *-offline-*.zip
 colosseum-*-offline-*.tar.gz
+
+# Local fuzz discoveries and crash artifacts
+.fuzz-work/

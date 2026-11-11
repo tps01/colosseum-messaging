@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from colosseum_messaging.ssh._glob import fnmatch_name, path_has_glob
+from colosseum_messaging.ssh._file_select import fnmatch_name, path_has_glob
 
 
 def test_path_has_glob_detects_wildcards() -> None:

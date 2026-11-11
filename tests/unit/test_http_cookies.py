@@ -75,6 +75,68 @@ def test_cross_origin_redirect_drops_stored_cookies(monkeypatch: pytest.MonkeyPa
     assert "cookie" not in {name.lower() for name in forwarded}
 
 
+def test_cookie_path_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, object]] = []
+    responses = [
+        (200, "admin", None, [("Set-Cookie", "sid=private; Path=/admin")]),
+        (200, "public", None, []),
+    ]
+
+    def _exchange(
+        _self: HttpClientWrapper,
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: dict[str, str],
+        _timeout: float,
+    ) -> tuple[int, str, str | None, list[tuple[str, str]]]:
+        _ = method, body
+        calls.append({"url": url, "headers": dict(headers)})
+        status, text, location, pairs = responses[len(calls) - 1]
+        return status, text, location, pairs
+
+    monkeypatch.setattr(HttpClientWrapper, "_exchange", _exchange)
+    client = _client()
+    client.request("GET", "/admin/login")
+    client.request("GET", "/public")
+    public_headers = calls[1]["headers"]
+    assert isinstance(public_headers, dict)
+    cookie = public_headers.get("Cookie", "")
+    assert "sid=private" not in cookie
+
+
+def test_max_age_zero_deletes_cookie(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, object]] = []
+    responses = [
+        (200, "in", None, [("Set-Cookie", "sid=valid; Path=/")]),
+        (200, "gone", None, [("Set-Cookie", "sid=gone; Path=/; Max-Age=0")]),
+        (200, "after", None, []),
+    ]
+
+    def _exchange(
+        _self: HttpClientWrapper,
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: dict[str, str],
+        _timeout: float,
+    ) -> tuple[int, str, str | None, list[tuple[str, str]]]:
+        _ = method, body
+        calls.append({"url": url, "headers": dict(headers)})
+        status, text, location, pairs = responses[len(calls) - 1]
+        return status, text, location, pairs
+
+    monkeypatch.setattr(HttpClientWrapper, "_exchange", _exchange)
+    client = _client()
+    client.request("GET", "/login")
+    client.request("GET", "/logout")
+    client.request("GET", "/next")
+    next_headers = calls[2]["headers"]
+    assert isinstance(next_headers, dict)
+    cookie = next_headers.get("Cookie", "")
+    assert "sid=" not in cookie
+
+
 def test_localhost_cookie_is_resent_on_the_next_request() -> None:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802

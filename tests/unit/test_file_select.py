@@ -46,9 +46,7 @@ class _Lister:
 
 
 def _remotes(local_spec: str, remote: str, *, recursive: bool = False) -> set[str]:
-    selected = [
-        path for path, _mtime in select_local_files(local_spec, recursive=recursive)
-    ]
+    selected = [path for path, _mtime in select_local_files(local_spec, recursive=recursive)]
     return {dest for _path, dest in map_local_put_paths(selected, local_spec, remote)}
 
 
@@ -96,10 +94,7 @@ def test_windows_drive_destination_keeps_the_directory(tmp_path: Path) -> None:
 
 
 def test_recursive_remote_glob_filters_basenames() -> None:
-    found = {
-        path
-        for path, _mtime in select_remote_files(_Lister(), "/logs/*.log", recursive=True)
-    }
+    found = {path for path, _mtime in select_remote_files(_Lister(), "/logs/*.log", recursive=True)}
     assert found == {"/logs/a.log", "/logs/sub/b.log"}
 
 

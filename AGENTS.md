@@ -17,7 +17,7 @@ Baseline expectations for AI agents in this plugin repository.
   HTTP/Redis/ZMQ/MQTT/SSH. Do not re-duplicate open/cache blocks per transport.
 - `colosseum_messaging/exceptions.py`: `MessagingCapabilityError` for
   Linux-first SSH refusals (no stub catalogs of unsupported commands).
-- `colosseum_messaging/ssh/_remote_path.py`, `_file_select.py`, `_glob.py`:
+- `colosseum_messaging/ssh/_remote_path.py`, `_file_select.py`:
   shared path/glob helpers for SFTP and SCP. Keep drive-letter support; do not
   invent a second path stack in `scp/`.
 - SCP reuses `messaging.ssh` config via `ssh_id`; do not add a separate SCP

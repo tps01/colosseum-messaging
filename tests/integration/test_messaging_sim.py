@@ -11,14 +11,10 @@ from colosseum.config import load_config
 
 
 def test_messaging_send_receive_verify(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    config_path = (
-        Path(__file__).resolve().parents[2]
-        / "examples"
-        / "configs"
-        / "config.messaging.sim.toml"
-    )
+    config_path = Path(__file__).resolve().parents[2] / "examples" / "configs" / "config.messaging.sim.toml"
     monkeypatch.chdir(tmp_path)
     ctx = context_module.init_context(test_case_name="messaging_sim")
     ctx.output_dir = tmp_path
@@ -27,9 +23,7 @@ def test_messaging_send_receive_verify(
 
     col.messaging.http.get(http_id=1, path="/health", key="health")
     assert col.messaging.http.verify_status(key="health", expected=200).status == "PASS"
-    assert col.messaging.http.verify_body_match(key="health", pattern=r"GET /health").status == (
-        "PASS"
-    )
+    assert col.messaging.http.verify_body_match(key="health", pattern=r"GET /health").status == ("PASS")
 
     col.messaging.redis.set(redis_id=1, name="foo", value="bar")
     col.messaging.redis.get(redis_id=1, name="foo", key="foo")
@@ -46,12 +40,18 @@ def test_messaging_send_receive_verify(
     assert col.messaging.mqtt.verify_payload_match(key="mqtt_msg", pattern=r"^on$").status == "PASS"
 
     out = col.messaging.ssh.measure_stdout(
-        ssh_id=1, command="cat /etc/version", key="uut_version",
+        ssh_id=1,
+        command="cat /etc/version",
+        key="uut_version",
     )
     assert "v1.2.3" in out
-    assert col.messaging.ssh.verify_stdout_match(
-        key="uut_version", pattern=r"v1\.2\.3",
-    ).status == "PASS"
+    assert (
+        col.messaging.ssh.verify_stdout_match(
+            key="uut_version",
+            pattern=r"v1\.2\.3",
+        ).status
+        == "PASS"
+    )
 
     result = col.messaging.ssh.exec(ssh_id=1, command="echo ok", key="exec_ok")
     assert result["stdout"] == "ok"
@@ -59,11 +59,17 @@ def test_messaging_send_receive_verify(
     assert col.messaging.ssh.verify_stdout_match(key="exec_ok", pattern=r"^ok$").status == "PASS"
 
     written = col.messaging.ssh.get(
-        ssh_id=1, remote="/etc/network/interfaces", local="interfaces", key="iface",
+        ssh_id=1,
+        remote="/etc/network/interfaces",
+        local="interfaces",
+        key="iface",
     )
     assert written
     scp_written = col.messaging.scp.get(
-        ssh_id=1, remote="/etc/network/interfaces", local="iface_scp", key="iface_scp",
+        ssh_id=1,
+        remote="/etc/network/interfaces",
+        local="iface_scp",
+        key="iface_scp",
     )
     assert scp_written
 
