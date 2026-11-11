@@ -160,7 +160,9 @@ def _walk_remote_dir(
                     ),
                 )
         elif name_pattern is None or fnmatch_name(
-            name, name_pattern, case_sensitive=case_sensitive,
+            name,
+            name_pattern,
+            case_sensitive=case_sensitive,
         ):
             results.append((child, mtime))
     return results
@@ -222,9 +224,7 @@ def _walk_local_dir(
 ) -> list[tuple[Path, float]]:
     results: list[tuple[Path, float]] = []
     for child in directory.iterdir():
-        if child.is_file() and (
-            pattern is None or fnmatch_name(child.name, pattern, case_sensitive=True)
-        ):
+        if child.is_file() and (pattern is None or fnmatch_name(child.name, pattern, case_sensitive=True)):
             results.append((child, child.stat().st_mtime))
         elif child.is_dir() and (max_depth is None or depth < max_depth):
             results.extend(
@@ -259,10 +259,7 @@ def map_remote_get_paths(
     mapped: list[tuple[str, Path]] = []
     for remote_path in remote_files:
         rel = _relative_remote(parent, remote_path)
-        if rel:
-            dest = local_root / Path(*rel.split("/"))
-        else:
-            dest = local_root / remote_basename(remote_path)
+        dest = local_root / Path(*rel.split("/")) if rel else local_root / remote_basename(remote_path)
         # Recheck the fully constructed destination, not only the local root.
         mapped.append((remote_path, resolve_local(str(dest))))
     return mapped

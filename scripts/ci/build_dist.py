@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build sdist + wheel into dist/ (CI-agnostic).
 
-  python scripts/ci/build_dist.py
+python scripts/ci/build_dist.py
 """
 
 from __future__ import annotations

@@ -243,7 +243,11 @@ def start_sender(*, redis_id: int, key: str = "") -> None:
 
 @command
 def enqueue(
-    *, redis_id: int, channel: str, message: str, key: str = "",
+    *,
+    redis_id: int,
+    channel: str,
+    message: str,
+    key: str = "",
 ) -> None:
     """Queue one Redis publish. ``start_sender`` must already be running.
 

@@ -254,8 +254,7 @@ def _lookup_http_measurement(key: str) -> tuple[object | None, str | None]:
         return None, None
     if len(hits) > 1:
         return None, (
-            f"ambiguous HTTP measurement key {key!r}: "
-            "matches multiple methods; use a distinct key per request"
+            f"ambiguous HTTP measurement key {key!r}: matches multiple methods; use a distinct key per request"
         )
     return hits[0], None
 

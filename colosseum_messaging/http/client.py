@@ -64,13 +64,22 @@ class HttpClientWrapper:
         timeout: float | None = None,
     ) -> dict[str, object]:
         method_u, url, body, req_headers, req_timeout = self._prepare_request(
-            method, path, json_body=json_body, data=data, headers=headers, timeout=timeout,
+            method,
+            path,
+            json_body=json_body,
+            data=data,
+            headers=headers,
+            timeout=timeout,
         )
         _logger.debug("HTTP %s %s timeout=%ss", method_u, url, req_timeout)
         if self._sim:
             return self._sim_request(method_u, path, body=body)
         status_code, text, header_pairs = self._follow_redirects(
-            method_u, url, body, req_headers, req_timeout,
+            method_u,
+            url,
+            body,
+            req_headers,
+            req_timeout,
         )
         return _finalize_response(status_code, text, header_pairs)
 
@@ -112,19 +121,24 @@ class HttpClientWrapper:
         try:
             while True:
                 status_code, text, location, header_pairs = self._exchange(
-                    method_u, url, body, req_headers, timeout,
+                    method_u,
+                    url,
+                    body,
+                    req_headers,
+                    timeout,
                 )
                 self._store_cookies(url, header_pairs)
-                if not (
-                    status_code in _REDIRECT_STATUSES
-                    and location
-                    and redirects < _MAX_REDIRECTS
-                ):
+                if not (status_code in _REDIRECT_STATUSES and location and redirects < _MAX_REDIRECTS):
                     return status_code, text, header_pairs
                 redirects += 1
                 next_url = urljoin(url, location)
                 method_u, body, req_headers = _rewrite_redirect(
-                    status_code, method_u, url, next_url, body, req_headers,
+                    status_code,
+                    method_u,
+                    url,
+                    next_url,
+                    body,
+                    req_headers,
                 )
                 url = next_url
                 req_headers = self._with_cookies(url, req_headers)
@@ -151,7 +165,10 @@ class HttpClientWrapper:
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
             connection: HTTPConnection = HTTPSConnection(
-                hostname, port, timeout=timeout, context=context,
+                hostname,
+                port,
+                timeout=timeout,
+                context=context,
             )
         else:
             connection = HTTPConnection(hostname, port, timeout=timeout)

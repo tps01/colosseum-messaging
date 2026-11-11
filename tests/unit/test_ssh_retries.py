@@ -63,13 +63,16 @@ def test_exhaustion_preserves_final_exception_and_closes_every_attempt(clients, 
         assert client.connect.call_args.kwargs["auth_timeout"] == 2.5
 
 
-@pytest.mark.parametrize("failure", [
-    paramiko.AuthenticationException("denied"),
-    paramiko.BadHostKeyException("host", Mock(), Mock()),
-    FileNotFoundError(errno.ENOENT, "missing key"),
-    PermissionError(errno.EACCES, "cannot read key"),
-    socket.gaierror(socket.EAI_NONAME, "no host"),
-])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        paramiko.AuthenticationException("denied"),
+        paramiko.BadHostKeyException("host", Mock(), Mock()),
+        FileNotFoundError(errno.ENOENT, "missing key"),
+        PermissionError(errno.EACCES, "cannot read key"),
+        socket.gaierror(socket.EAI_NONAME, "no host"),
+    ],
+)
 def test_permanent_failures_are_not_retried(clients, failure):
     created, outcomes = clients
     outcomes.append(failure)

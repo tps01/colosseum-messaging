@@ -42,7 +42,11 @@ def main() -> int:
             "-artifact_prefix=" + str(artifacts) + "/",
         ]
         result = subprocess.run(
-            command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT, check=False,
+            command,
+            cwd=REPO,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            check=False,
         )
     if result.returncode:
         print(f"Fuzzing failed ({result.returncode}); inspect {log_path} and {artifacts}")
