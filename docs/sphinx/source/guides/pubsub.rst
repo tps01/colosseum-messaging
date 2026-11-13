@@ -71,14 +71,14 @@ and Redis ``publish`` stay callable from the test thread while ``listen`` is
 running. ``start_sender`` is the queued path::
 
    col.messaging.mqtt.listen(
-       mqtt_id=1, key="status", topic="device/#",
+       mqtt_id=1, key="mqtt_status", topic="device/#",
        fail_pattern=r"\b(ERR|FAULT|offline)\b",
    )
    col.messaging.mqtt.stop_listen(mqtt_id=1, key="mqtt_status")
    col.messaging.mqtt.verify_listen(key="mqtt_status", max_silence_s=0.5, min_received=1)
 
    col.messaging.redis.listen(
-       redis_id=1, channel="events", key="mqtt_status",
+       redis_id=1, channel="events", key="redis_status",
        fail_pattern=r"\b(ERR|FAULT|offline)\b",
    )
    col.messaging.redis.stop_listen(redis_id=1, key="redis_status")
