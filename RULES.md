@@ -90,12 +90,22 @@ Only the following licenses are allowed:
   infrastructure, tests, exceptions, etc.
 - Do not over-use helper functions or lambda functions. While they have a place,
   sometimes it's more clear to juse do a one-off operation in-line.
-- Avoid magic numbers. Instead define a variable with a semantic meaning, or
-  just place a comment above it.
 - Do not overengineer. Not everything needs an entire supporting system.
   Minimizing the footprint of your code is paramount for human readability.
 - Do not add fallback mechanisms for everything. Elaborate error handling is
   often unnecessary.
+
+### Antipatterns
+
+- **Magic numbers and values:** Do not scatter unexplained literal values through
+  implementation code. Use descriptive named constants for colors, timeouts,
+  thresholds, protocol values and layout dimensions whose meaning is not obvious.
+  Include units in names where useful, such as `_READ_TIMEOUT_S`.
+  For example, name a light/dark color pair `_PURPLE` or `_GREEN` and reference
+  it in a status palette rather than repeating hex codes in widgets or mappings.
+  Keep constants near their owning code and reuse existing definitions. Obvious
+  literals such as zero-based indexes do not need artificial names; fixed values
+  prescribed by an external format should have a named constant or a source comment.
 
 ### Footprint
 
