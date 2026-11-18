@@ -79,3 +79,17 @@ messaging.ssh
    auth = "auto"                       # optional; default auto; auto accepts first-seen keys; none and auth_none require a trusted key
    platform = "linux"                  # optional; default linux when empty; linux or windows
    known_hosts = ""                    # optional path; omitted loads system host keys; auth auto creates a missing file
+
+For an endpoint reached through one SSH jump host, add these fields to its
+``[messaging.ssh]`` row::
+
+   jump_host = "jump.example"
+   jump_username = "jump-user"
+   jump_password = "jump-password"
+   jump_port = 22                      # optional
+   jump_known_hosts = ""               # optional path to the jump host's known hosts
+
+Set ``jump_host``, ``jump_username``, and ``jump_password`` together. The jump
+host must permit TCP forwarding to the endpoint. The row's ``timeout``
+also bounds setup phases on the jump host and opening the forwarded channel.
+See :ref:`ssh-jump-host` for a complete row.

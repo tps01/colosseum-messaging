@@ -13,6 +13,12 @@ from colosseum_messaging.ssh import api
 from colosseum_messaging.ssh.client import SSHClientWrapper, _HostKeyError
 
 CONFIG = {"host": "bench.example", "username": "user", "password": "secret"}
+JUMP = {
+    "jump_host": "jump.example",
+    "jump_username": "jump-user",
+    "jump_password": "jump-secret",
+    "jump_port": 2222,
+}
 
 
 @pytest.fixture
@@ -46,6 +52,84 @@ def test_default_retry_succeeds_with_fresh_clients_and_default_timeouts(clients)
     assert [c.close.call_count for c in created] == [1, 1, 0]
     wrapper.close()
     created[-1].close.assert_called_once()
+
+
+def test_jump_fields_route_endpoint_connection_and_close_both_hops(tmp_path, clients):
+    created, _ = clients
+    init_context(test_case_name="ssh_jump", no_artifacts=True)
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[messaging.ssh]\nssh_id = 1\nhost = "bench.example"\nport = 2022\n'
+        'username = "user"\npassword = "secret"\ntimeout = 2.5\n'
+        'jump_host = "jump.example"\njump_port = 2222\n'
+        'jump_username = "jump-user"\njump_password = "jump-secret"\n',
+        encoding="utf-8",
+    )
+    load_config(config)
+
+    wrapper = get_ssh_client(1, retries=1)
+    jump, endpoint = created
+    jump.connect.assert_called_once_with(
+        hostname="jump.example",
+        port=2222,
+        username="jump-user",
+        password="jump-secret",
+        timeout=2.5,
+        banner_timeout=2.5,
+        auth_timeout=2.5,
+        allow_agent=False,
+        look_for_keys=False,
+    )
+    forward = jump.get_transport.return_value.open_channel
+    forward.assert_called_once_with(
+        "direct-tcpip", dest_addr=("bench.example", 2022), src_addr=("127.0.0.1", 0), timeout=2.5,
+    )
+    endpoint.connect.assert_called_once_with(
+        hostname="bench.example",
+        port=2022,
+        username="user",
+        password="secret",
+        sock=forward.return_value,
+        timeout=2.5,
+        banner_timeout=2.5,
+        auth_timeout=2.5,
+        allow_agent=False,
+        look_for_keys=False,
+    )
+    assert wrapper.get_transport() is endpoint.get_transport.return_value
+    assert get_ssh_client(1) is wrapper
+    wrapper.close()
+    wrapper.close()
+    endpoint.close.assert_called_once_with()
+    forward.return_value.close.assert_called_once_with()
+    jump.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize("error", [TimeoutError(), paramiko.AuthenticationException("endpoint denied")])
+def test_jump_releases_failed_hops_and_retries_only_transient_errors(clients, error):
+    created, outcomes = clients
+    outcomes.extend([None, error])
+    config = {**CONFIG, **JUMP}
+    if isinstance(error, TimeoutError):
+        with_retry = SSHClientWrapper(config, retries=2)
+        assert len(created) == 4
+        assert with_retry.get_transport() is created[-1].get_transport.return_value
+        with_retry.close()
+    else:
+        with pytest.raises(paramiko.AuthenticationException):
+            SSHClientWrapper(config, retries=2)
+        assert len(created) == 2
+    bad_jump, bad_endpoint = created[:2]
+    bad_endpoint.close.assert_called_once_with()
+    bad_jump.get_transport.return_value.open_channel.return_value.close.assert_called_once_with()
+    bad_jump.close.assert_called_once_with()
+
+
+def test_jump_requires_separate_password_before_opening(clients):
+    created, _ = clients
+    with pytest.raises(ValueError, match=r"messaging\.ssh\.jump_password"):
+        SSHClientWrapper({**CONFIG, "jump_host": JUMP["jump_host"], "jump_username": JUMP["jump_username"]})
+    assert not created
 
 
 @pytest.mark.parametrize("retries,expected", [(None, 3), (0, 1), (1, 1), (2, 2), (5, 5)])

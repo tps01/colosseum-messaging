@@ -90,10 +90,33 @@ _ALLOWED_AUTH = frozenset({"", "auto", "none", "auth_none"})
 _ALLOWED_PLATFORMS = frozenset({"", "linux", "windows"})
 
 
+def _jump_config(config: Mapping[str, object]) -> dict[str, object] | None:
+    required = ("host", "username", "password")
+    jump = {
+        field: config[f"jump_{field}"]
+        for field in (*required, "port", "known_hosts")
+        if f"jump_{field}" in config
+    }
+    if not jump:
+        return None
+    for field in required:
+        entry = jump.get(field)
+        if not isinstance(entry, str) or not entry:
+            raise ValueError(f"messaging.ssh.jump_{field} must be a nonempty string")
+    port = jump.get("port", 22)
+    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+        raise ValueError("messaging.ssh.jump_port must be an integer between 1 and 65535")
+    if not isinstance(jump.get("known_hosts", ""), str):
+        raise ValueError("messaging.ssh.jump_known_hosts must be a path string")
+    return jump
+
+
 class SSHClientWrapper:
     def __init__(self, config: Mapping[str, object], *, retries: int = 3) -> None:
         attempts = _connection_attempts(retries)
         self._config = dict(config)
+        self._jump = _jump_config(config)
+        self._jump_resources = contextlib.ExitStack()
         self._client: paramiko.SSHClient | None = None
         self._sftp: paramiko.SFTPClient | None = None
         self._sim_fs: SimRemoteFS | None = None
@@ -135,20 +158,17 @@ class SSHClientWrapper:
     def is_sim(self) -> bool:
         return self._sim
 
-    def _load_host_keys(self, client: paramiko.SSHClient) -> None:
-        known_hosts = self._config.get("known_hosts")
+    @staticmethod
+    def _apply_host_key_policy(client: paramiko.SSHClient, *, known_hosts: object, auth: str) -> None:
         if known_hosts:
             path = Path(str(known_hosts))
-            if self._auth == "auto" and not path.exists():
+            if auth == "auto" and not path.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch(exist_ok=True)
             client.load_host_keys(str(path))
-            return
-        client.load_system_host_keys()
-
-    def _apply_host_key_policy(self, client: paramiko.SSHClient) -> None:
-        self._load_host_keys(client)
-        if self._auth == "auto":
+        else:
+            client.load_system_host_keys()
+        if auth == "auto":
             # Auto mode accepts first-seen server keys without manual enrollment.
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
         else:
@@ -156,7 +176,7 @@ class SSHClientWrapper:
 
     def _require_known_host_key(self, hostname: str, port: int, key: paramiko.PKey) -> None:
         checker = paramiko.SSHClient()
-        self._apply_host_key_policy(checker)
+        self._apply_host_key_policy(checker, known_hosts=self._config.get("known_hosts"), auth=self._auth)
         host_id = hostname if port == 22 else f"[{hostname}]:{port}"
         # load_system_host_keys fills a separate store from get_host_keys().
         stores = (
@@ -222,20 +242,47 @@ class SSHClientWrapper:
                 return
 
     def _connect_once(self) -> None:
-        if self._auth in ("none", "auth_none"):
-            self._connect_auth_none()
-            return
+        with contextlib.ExitStack() as jump_resources:
+            sock = self._open_jump(self._jump, jump_resources) if self._jump is not None else None
+            if self._auth in ("none", "auth_none"):
+                self._connect_auth_none(sock)
+            else:
+                self._client = self._connect_auto(self._config, sock=sock)
+            self._jump_resources = jump_resources.pop_all()
 
+    def _open_jump(self, config: Mapping[str, object], resources: contextlib.ExitStack) -> paramiko.Channel:
+        jump_client = self._connect_auto(config)
+        resources.callback(jump_client.close)
+        transport = jump_client.get_transport()
+        if transport is None:
+            raise paramiko.SSHException("SSH jump host transport is unavailable")
+        channel = transport.open_channel(
+            "direct-tcpip",
+            dest_addr=(str(self._config["host"]), int(str(self._config.get("port", 22)))),
+            src_addr=("127.0.0.1", 0),
+            timeout=self._connect_timeout,
+        )
+        resources.callback(channel.close)
+        return channel
+
+    def _connect_auto(
+        self,
+        config: Mapping[str, object],
+        *,
+        sock: paramiko.Channel | None = None,
+    ) -> paramiko.SSHClient:
         connect_kwargs: dict[str, Any] = {
-            "hostname": str(self._config["host"]),
-            "port": int(str(self._config.get("port", 22))),
-            "username": str(self._config["username"]),
+            "hostname": str(config["host"]),
+            "port": int(str(config.get("port", 22))),
+            "username": str(config["username"]),
             "timeout": self._connect_timeout,
             "banner_timeout": self._connect_timeout,
             "auth_timeout": self._connect_timeout,
         }
-        password = self._config.get("password")
-        key_filename = self._config.get("key_filename") or ""
+        if sock is not None:
+            connect_kwargs["sock"] = sock
+        password = config.get("password")
+        key_filename = config.get("key_filename") or ""
         if key_filename:
             connect_kwargs["key_filename"] = str(key_filename)
         elif password is not None:
@@ -244,26 +291,26 @@ class SSHClientWrapper:
             connect_kwargs["look_for_keys"] = False
         client = paramiko.SSHClient()
         try:
-            self._apply_host_key_policy(client)
+            self._apply_host_key_policy(client, known_hosts=config.get("known_hosts"), auth="auto")
             client.connect(**connect_kwargs)
-            self._client = client
-        finally:
-            if self._client is not client:
-                client.close()
+        except BaseException:
+            client.close()
+            raise
         _logger.debug(
             "SSH connected to %s:%s as %s",
             connect_kwargs["hostname"],
             connect_kwargs["port"],
             connect_kwargs["username"],
         )
+        return client
 
-    def _connect_auth_none(self) -> None:
+    def _connect_auth_none(self, channel: paramiko.Channel | None) -> None:
         hostname = str(self._config["host"])
         port = int(str(self._config.get("port", 22)))
         username = str(self._config["username"])
         timeout = self._connect_timeout
         # Transport((host, port)) opens a socket without our TCP connection timeout.
-        sock = socket.create_connection((hostname, port), timeout=timeout)
+        sock = channel if channel is not None else socket.create_connection((hostname, port), timeout=timeout)
         transport: paramiko.Transport | None = None
         client: paramiko.SSHClient | None = None
         try:
@@ -275,7 +322,7 @@ class SSHClientWrapper:
             self._require_known_host_key(hostname, port, remote_key)
             transport.auth_none(username)
             client = paramiko.SSHClient()
-            self._apply_host_key_policy(client)
+            self._apply_host_key_policy(client, known_hosts=self._config.get("known_hosts"), auth=self._auth)
             transport_attr = "_transport"
             setattr(client, transport_attr, transport)
             self._client = client
@@ -285,7 +332,8 @@ class SSHClientWrapper:
                     client.close()
                 if transport is not None:
                     transport.close()
-                sock.close()
+                if channel is None:
+                    sock.close()
         _logger.debug("SSH connected to %s:%s as %s (auth=none)", hostname, port, username)
 
     def get_platform(self) -> str:
@@ -674,18 +722,19 @@ class SSHClientWrapper:
         return [path for path, _mtime in selected]
 
     def close(self) -> None:
-        with self._jobs_lock:
-            jobs = list(self._jobs.values())
-        for job in jobs:
-            if not job.done.is_set():
-                if job.channel is not None:
-                    job.channel.close()
-                if job.thread is not None:
-                    job.thread.join(timeout=1.0)
-                job.done.set()
-        if self._sftp is not None:
-            self._sftp.close()
-            self._sftp = None
-        if self._client is not None:
-            self._client.close()
-            self._client = None
+        with self._jump_resources:
+            if self._client is not None:
+                self._jump_resources.callback(self._client.close)
+                self._client = None
+            if self._sftp is not None:
+                self._jump_resources.callback(self._sftp.close)
+                self._sftp = None
+            with self._jobs_lock:
+                jobs = list(self._jobs.values())
+            for job in jobs:
+                if not job.done.is_set():
+                    if job.channel is not None:
+                        job.channel.close()
+                    if job.thread is not None:
+                        job.thread.join(timeout=1.0)
+                    job.done.set()
