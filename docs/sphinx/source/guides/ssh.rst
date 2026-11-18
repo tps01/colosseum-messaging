@@ -97,3 +97,59 @@ See :doc:`/api/ssh` for ``start`` / ``collect`` and their recorded evidence,
 The ``timeout`` in TOML bounds connection phases; the call's ``timeout=``
 bounds command execution or collection. A completed nonzero exit requires an
 explicit ``verify_exit`` check to fail acceptance.
+
+.. _ssh-jump-host:
+
+Connect through a jump host
+---------------------------
+
+Add the jump host's settings to the endpoint's SSH row.
+
+.. code-block:: toml
+
+   [messaging.ssh]
+   ssh_id = 1
+   host = "target.internal"
+   username = "target-user"
+   password = "target-password"
+
+   jump_host = "jump.example"
+   jump_username = "jump-user"
+   jump_password = "jump-password"
+
+Use the same ``ssh_id`` for SSH commands, SFTP, and SCP. The jump host opens
+the forwarded connection to ``target.internal`` and must allow TCP forwarding.
+Each hop checks host keys under its own hostname and port. The jump host uses
+the ``auto`` host-key policy described above and reads the optional
+``jump_known_hosts`` file. A connection retry opens a fresh connection to each hop.
+
+Discover SSH hosts from ARP
+---------------------------
+
+In a CLI-managed ``main``, populate the active SSH configuration from ARP
+traffic on the Linux host running Colosseum::
+
+   store = col.messaging.ssh.autoconfig(
+       source="Xilinx",
+       username="test",
+       blacklist=["eth1", "192.168.100.10", "10.42.0.0/16"],
+       listen_timeout=15.0,
+   )
+   print(store.list_items("messaging.ssh"))
+
+``source`` is required. It matches a case-insensitive substring of the
+Ethernet source MAC address or its registered IEEE vendor name. The listener
+uses the sender IPv4 address from each ARP request or reply. The capture host
+needs raw socket access (``CAP_NET_RAW``).
+
+Blacklist entries accept interface names, local IPv4 addresses, and IPv4
+CIDRs. An interface name or local address excludes the associated subnets.
+The capture window defaults to 10 seconds, and the ICMP reply timeout defaults
+to one second per host and interface. The lowest measured round-trip time
+gets ``ssh_id=1``. Hosts without an ICMP reply follow responsive hosts.
+Equal or unavailable times are ordered by numeric IPv4 address.
+
+The generated rows replace the active ``messaging.ssh`` section and are
+immediately available to SSH, SFTP and SCP. The local username is used when
+``username`` is omitted. If the listener observes no eligible sender, it
+raises ``ConfigError`` before applying any config changes.
