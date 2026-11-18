@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import re
-from typing import cast
+from copy import deepcopy
+from getpass import getuser
+from typing import TYPE_CHECKING, cast
 
-from colosseum.context import get_context
+from colosseum.config.loader import ConfigError, apply_raw_config, default_test_name
+from colosseum.context import get_context, init_context
 from colosseum.decorators import (
     VerificationResult,
     command,
@@ -13,7 +16,13 @@ from colosseum.decorators import (
 )
 from colosseum.logging import get_logger
 
-from colosseum_messaging.connections import get_ssh_client
+from colosseum_messaging.connections import close_ssh_clients, get_ssh_client
+from colosseum_messaging.ssh._autoconfig import discover_ssh_hosts
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from colosseum.config.loader import ConfigStore
 
 _logger = get_logger("colosseum.messaging")
 
@@ -26,6 +35,56 @@ _SSH_STDOUT_COMMANDS = (
     *_SSH_EXEC_COMMANDS,
     "ssh.measure_stdout",
 )
+
+
+def autoconfig(
+    *,
+    source: str,
+    username: str | None = None,
+    blacklist: str | Sequence[str] | None = None,
+    listen_timeout: float = 10.0,
+    probe_timeout: float = 1.0,
+) -> ConfigStore:
+    """Populate ``messaging.ssh`` with locally observed IPv4 ARP senders.
+
+    Assign IDs from 1 in ascending ICMP round-trip time. Senders without an
+    ICMP reply follow measured senders. Ties are ordered by numeric IPv4 address.
+    The capture host must run Linux with raw socket access (CAP_NET_RAW).
+
+    :param source: Case-insensitive substring of the Ethernet source MAC or its IEEE vendor name.
+    :param username: Username for generated SSH rows. Defaults to the local username.
+    :param blacklist: Interface names, local IPv4 addresses, or IPv4 CIDRs to exclude.
+        An interface name or local address excludes its associated subnet(s).
+    :param listen_timeout: Number of seconds to listen for ARP traffic.
+    :param probe_timeout: Seconds to wait for an ICMP reply per host and interface.
+    :returns: Active config store with the generated SSH rows.
+    :raises ConfigError: If discovery finds no matching senders or configuration is invalid.
+    """
+    username = getuser() if username is None else username
+    if not username.strip():
+        raise ConfigError("SSH autoconfig username must not be empty")
+    hosts = discover_ssh_hosts(
+        source,
+        listen_timeout=listen_timeout,
+        probe_timeout=probe_timeout,
+        blacklist=blacklist,
+    )
+    try:
+        ctx = get_context()
+    except RuntimeError:
+        ctx = init_context(test_case_name=default_test_name())
+    raw = deepcopy(ctx.config.raw()) if ctx.config is not None else {}
+    messaging = raw.setdefault("messaging", {})
+    if not isinstance(messaging, dict):
+        raise ConfigError("Config section `messaging` must be a table")
+    rows = [
+        {"ssh_id": ssh_id, "host": host, "username": username}
+        for ssh_id, host in enumerate(hosts, start=1)
+    ]
+    messaging["ssh"] = rows[0] if len(rows) == 1 else rows
+    store = apply_raw_config(ctx, raw, source_label="(ssh autoconfig)")
+    close_ssh_clients()
+    return store
 
 
 @measurement
