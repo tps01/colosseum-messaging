@@ -89,7 +89,10 @@ For an endpoint reached through one SSH jump host, add these fields to its
    jump_port = 22                      # optional
    jump_known_hosts = ""               # optional path to the jump host's known hosts
 
-Set ``jump_host``, ``jump_username``, and ``jump_password`` together. The jump
-host must permit TCP forwarding to the endpoint. The row's ``timeout``
-also bounds setup phases on the jump host and opening the forwarded channel.
-See :ref:`ssh-jump-host` for a complete row.
+Set either the three inline credential fields together or ``jump_id``, the
+integer ID of another SSH row with a password. A reference supplies that row's
+``host``, ``username``, ``password``, and any ``port`` or ``known_hosts``.
+Set ``jump_port`` or ``jump_known_hosts`` to override the referenced value.
+Each connection uses one jump host. The row's ``timeout`` also bounds setup
+phases on the jump host and opening the forwarded channel. See
+:ref:`ssh-jump-host` for examples.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from colosseum.config.loader import ConfigError
@@ -110,6 +109,30 @@ def get_mqtt_client(mqtt_id: int) -> MqttClientWrapper:
     )
 
 
+def _resolve_ssh_jump(config: dict[str, object]) -> dict[str, object]:
+    if "jump_id" not in config:
+        return config
+    jump_id = config["jump_id"]
+    if isinstance(jump_id, bool) or not isinstance(jump_id, int):
+        raise ConfigError("messaging.ssh.jump_id must be an integer SSH id")
+    if jump_id == config["ssh_id"]:
+        raise ConfigError("messaging.ssh.jump_id must reference another SSH row")
+    credentials = ("host", "username", "password")
+    if any(f"jump_{field}" in config for field in credentials):
+        raise ConfigError("Choose either messaging.ssh.jump_id or jump_host, jump_username, and jump_password")
+
+    jump = _require_config_item("messaging.ssh", jump_id)
+    password = jump.get("password")
+    if not isinstance(password, str) or not password:
+        raise ConfigError(f"messaging.ssh.jump_id {jump_id} references an SSH row without a nonempty password")
+    config.update({f"jump_{field}": jump[field] for field in credentials})
+    if "jump_port" not in config and "port" in jump:
+        config["jump_port"] = int(str(jump["port"]))
+    if "known_hosts" in jump:
+        config.setdefault("jump_known_hosts", jump["known_hosts"])
+    return config
+
+
 def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
     from colosseum_messaging.ssh.client import SSHClientWrapper, _connection_attempts
 
@@ -118,7 +141,7 @@ def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
         section="messaging.ssh",
         item_id=ssh_id,
         cache_prefix=_SSH_CACHE_PREFIX,
-        wrapper_cls=partial(SSHClientWrapper, retries=retries),
+        wrapper_cls=lambda cfg: SSHClientWrapper(_resolve_ssh_jump(cfg), retries=retries),
         default_driver="ssh",
         detail=lambda cfg: f"host={cfg.get('host')}",
     )

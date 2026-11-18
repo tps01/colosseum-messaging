@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import paramiko
 import pytest
 from colosseum.config import load_config
+from colosseum.config.loader import ConfigError
 from colosseum.context import init_context
 from colosseum_messaging.connections import get_ssh_client
 from colosseum_messaging.ssh import api
@@ -129,6 +130,66 @@ def test_jump_requires_separate_password_before_opening(clients):
     created, _ = clients
     with pytest.raises(ValueError, match=r"messaging\.ssh\.jump_password"):
         SSHClientWrapper({**CONFIG, "jump_host": JUMP["jump_host"], "jump_username": JUMP["jump_username"]})
+    assert not created
+
+
+@pytest.mark.parametrize("override", [False, True])
+def test_jump_id_uses_the_referenced_ssh_row(tmp_path, clients, override):
+    created, _ = clients
+    init_context(test_case_name="ssh_jump_id", no_artifacts=True)
+    referenced_keys = tmp_path / "jump_keys"
+    override_keys = tmp_path / "override_keys"
+    overrides = f'jump_port = 2223\njump_known_hosts = "{override_keys.as_posix()}"\n' if override else ""
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[[messaging.ssh]]\nssh_id = 1\nhost = "bench.example"\nusername = "user"\npassword = "secret"\njump_id = 2\n'
+        f'{overrides}[[messaging.ssh]]\nssh_id = 2\nhost = "jump.example"\nusername = "jump-user"\n'
+        f'password = "jump-secret"\nport = "2222"\nknown_hosts = "{referenced_keys.as_posix()}"\n',
+        encoding="utf-8",
+    )
+    store = load_config(config)
+
+    wrapper = get_ssh_client(1, retries=1)
+    try:
+        jump, endpoint = created
+        jump_args = jump.connect.call_args.kwargs
+        assert jump_args["hostname"] == "jump.example"
+        assert jump_args["username"] == "jump-user"
+        assert jump_args["password"] == "jump-secret"
+        assert jump_args["port"] == (2223 if override else 2222)
+        jump.load_host_keys.assert_called_once_with(str(override_keys if override else referenced_keys))
+        endpoint_args = endpoint.connect.call_args.kwargs
+        assert endpoint_args["hostname"] == "bench.example"
+        assert endpoint_args["password"] == "secret"
+        assert endpoint_args["sock"] is jump.get_transport.return_value.open_channel.return_value
+        assert "jump_password" not in store.require_item("messaging.ssh", 1)
+    finally:
+        wrapper.close()
+
+
+@pytest.mark.parametrize(
+    ("jump_settings", "message"),
+    [
+        ("jump_id = true", "jump_id must be an integer"),
+        ("jump_id = 1", "jump_id must reference another SSH row"),
+        ("jump_id = 99", "Unknown id"),
+        ('jump_id = 2\njump_password = "duplicate"', "Choose either messaging.ssh.jump_id"),
+        ("jump_id = 2", "SSH row without a nonempty password"),
+    ],
+)
+def test_invalid_jump_id_fails_before_opening(tmp_path, clients, jump_settings, message):
+    created, _ = clients
+    init_context(test_case_name="invalid_ssh_jump_id", no_artifacts=True)
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[[messaging.ssh]]\nssh_id = 1\nhost = "bench.example"\nusername = "user"\n'
+        f'{jump_settings}\n[[messaging.ssh]]\nssh_id = 2\nhost = "jump.example"\nusername = "jump-user"\n',
+        encoding="utf-8",
+    )
+    load_config(config)
+
+    with pytest.raises(ConfigError, match=message):
+        get_ssh_client(1)
     assert not created
 
 

@@ -77,6 +77,7 @@ def register(registry: PluginRegistry) -> None:
                 "auth",
                 "platform",
                 "known_hosts",
+                "jump_id",
                 "jump_host",
                 "jump_port",
                 "jump_username",
