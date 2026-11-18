@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from colosseum_messaging.zmq.client import ZmqClientWrapper
 
 _logger = get_logger("colosseum.messaging")
+_SSH_CACHE_PREFIX = "messaging:ssh"
 
 T = TypeVar("T")
 
@@ -116,7 +117,7 @@ def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
     return _cached_client(
         section="messaging.ssh",
         item_id=ssh_id,
-        cache_prefix="messaging:ssh",
+        cache_prefix=_SSH_CACHE_PREFIX,
         wrapper_cls=partial(SSHClientWrapper, retries=retries),
         default_driver="ssh",
         detail=lambda cfg: f"host={cfg.get('host')}",
@@ -124,14 +125,21 @@ def get_ssh_client(ssh_id: int, *, retries: int = 3) -> SSHClientWrapper:
 
 
 def close_all() -> None:
-    ctx = get_context()
-    prefixes = (
+    _close_clients(
         "messaging:http:",
         "messaging:redis:",
         "messaging:zmq:",
         "messaging:mqtt:",
-        "messaging:ssh:",
+        f"{_SSH_CACHE_PREFIX}:",
     )
+
+
+def close_ssh_clients() -> None:
+    _close_clients(f"{_SSH_CACHE_PREFIX}:")
+
+
+def _close_clients(*prefixes: str) -> None:
+    ctx = get_context()
     keys = [key for key in ctx.resource_cache if key.startswith(prefixes)]
     if keys:
         _logger.debug("Closing %d cached resource(s)", len(keys))
