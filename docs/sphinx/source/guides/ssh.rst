@@ -123,6 +123,27 @@ Each hop checks host keys under its own hostname and port. The jump host uses
 the ``auto`` host-key policy described above and reads the optional
 ``jump_known_hosts`` file. A connection retry opens a fresh connection to each hop.
 
+When the jump host already has its own SSH row, reference its ``ssh_id`` from
+the endpoint row.
+
+.. code-block:: toml
+
+   [[messaging.ssh]]
+   ssh_id = 1
+   host = "jump.example"
+   username = "jump-user"
+   password = "jump-password"
+
+   [[messaging.ssh]]
+   ssh_id = 2
+   host = "target.internal"
+   username = "target-user"
+   password = "target-password"
+   jump_id = 1
+
+Connect to the endpoint with ``ssh_id=2``. Colosseum reads the jump host's
+credentials from row 1 and opens a single hop to the endpoint.
+
 Discover SSH hosts from ARP
 ---------------------------
 
