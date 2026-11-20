@@ -1,4 +1,4 @@
-"""Cookie jar on the live HTTP client."""
+"""Live HTTP response handling."""
 
 from __future__ import annotations
 
@@ -6,9 +6,13 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING
 
+import colosseum.context as context_module
+from colosseum_messaging.http import api
 from colosseum_messaging.http.client import HttpClientWrapper
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
 
@@ -173,3 +177,41 @@ def test_localhost_cookie_is_resent_on_the_next_request() -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_http_body_verification_uses_response_charset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = "caf\u00e9"
+    responses = {
+        "/declared": ('text/plain; CHARSET="ISO-8859-1"', text.encode("iso-8859-1")),
+        "/no-charset": ("text/plain", text.encode("utf-8")),
+        "/unknown": ("text/plain; charset=unknown", text.encode("utf-8")),
+        "/invalid": ("text/plain; charset=utf-8", b"\xff"),
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            content_type, body = responses[self.path]
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.end_headers()
+            self.wfile.write(body)
+
+    ctx = context_module.init_context(test_case_name="http_charset")
+    ctx.output_dir = tmp_path
+    ctx.db.initialize(tmp_path / "execution.sqlite")
+    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+        client = HttpClientWrapper({"base_url": f"http://127.0.0.1:{server.server_port}"})
+        monkeypatch.setattr(api, "get_http_client", lambda _: client)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            for path in responses:
+                key = path[1:]
+                expected = "\ufffd" if path == "/invalid" else text
+                assert api.get(http_id=1, path=path, key=key)["body"] == expected
+                assert api.verify_body_match(key=key, pattern=f"^{expected}$").status == "PASS"
+        finally:
+            server.shutdown()
+            thread.join()
