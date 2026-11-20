@@ -178,10 +178,15 @@ class HttpClientWrapper:
             raw = response.read()
             status = int(response.status)
             location = response.getheader("Location")
+            charset = response.headers.get_content_charset() or "utf-8"
             header_pairs = [(str(name), str(value)) for name, value in response.getheaders()]
         finally:
             connection.close()
-        return status, raw.decode("utf-8", errors="replace"), location, header_pairs
+        try:
+            text = raw.decode(charset, errors="replace")
+        except (LookupError, UnicodeError):
+            text = raw.decode("utf-8", errors="replace")
+        return status, text, location, header_pairs
 
     def _with_cookies(self, url: str, headers: Mapping[str, str]) -> dict[str, str]:
         request = Request(url)
