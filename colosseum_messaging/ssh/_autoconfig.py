@@ -1,10 +1,11 @@
-"""Passive Ethernet ARP discovery and ICMP timing on the local Linux host."""
+"""Passive Ethernet ARP discovery and ICMP timing on the local host."""
 
 from __future__ import annotations
 
 import socket
 import struct
 import sys
+from contextlib import closing
 from functools import lru_cache
 from ipaddress import IPv4Address, IPv4Interface, IPv4Network
 from math import inf, isfinite
@@ -48,11 +49,13 @@ def _ipv4_bindings() -> dict[str, list[IPv4Interface]]:
 def _blocked_networks(
     blacklist: str | Sequence[str] | None,
     bindings: dict[str, list[IPv4Interface]],
+    aliases: dict[str, str],
 ) -> set[IPv4Network]:
     entries = [blacklist] if isinstance(blacklist, str) else blacklist or ()
     blocked: set[IPv4Network] = set()
     for entry in entries:
         name = entry.strip().casefold()
+        name = aliases.get(name, name)
         if "/" in name:
             try:
                 blocked.add(IPv4Network(name, strict=False))
@@ -95,19 +98,31 @@ def _listen_for_arp(timeout: float) -> Iterator[tuple[str, bytes, IPv4Address]]:
                 "tuple[str, int, int, int, bytes]",
                 address,
             )
-            if (
-                packet_type == socket.PACKET_OUTGOING
-                or hardware_type != _ARPHRD_ETHER
-                or len(payload) < _ARP_IPV4.size
-            ):
+            if packet_type == socket.PACKET_OUTGOING or hardware_type != _ARPHRD_ETHER:
                 continue
-            hardware, protocol, mac_size, ip_size, opcode, sender_mac, sender_ip = _ARP_IPV4.unpack(payload)
-            if (
-                (hardware, protocol, mac_size, ip_size) == (_ARPHRD_ETHER, _ETH_P_IPV4, 6, 4)
-                and opcode in _ARP_REQUEST_REPLY
-                and sender_mac == ethernet_source
-            ):
-                yield interface, ethernet_source, IPv4Address(sender_ip)
+            host = _arp_sender(payload, ethernet_source)
+            if host is not None:
+                yield interface, ethernet_source, host
+
+
+def _arp_sender(payload: bytes, ethernet_source: bytes) -> IPv4Address | None:
+    if len(payload) < _ARP_IPV4.size:
+        return None
+    hardware, protocol, mac_size, ip_size, opcode, sender_mac, sender_ip = _ARP_IPV4.unpack_from(payload)
+    if (
+        (hardware, protocol, mac_size, ip_size) == (_ARPHRD_ETHER, _ETH_P_IPV4, 6, 4)
+        and opcode in _ARP_REQUEST_REPLY
+        and sender_mac == ethernet_source
+    ):
+        return IPv4Address(sender_ip)
+    return None
+
+
+def _windows_arp_senders(frames: Iterator[tuple[str, bytes, bytes]]) -> Iterator[tuple[str, bytes, IPv4Address]]:
+    for interface, mac, payload in frames:
+        host = _arp_sender(payload, mac)
+        if host is not None:
+            yield interface, mac, host
 
 
 def _icmp_rtt(host: IPv4Address, interface: str, timeout: float) -> float:
@@ -136,11 +151,10 @@ def _icmp_rtt(host: IPv4Address, interface: str, timeout: float) -> float:
 
 def _candidates(
     source: str,
-    listen_timeout: float,
-    blacklist: str | Sequence[str] | None,
+    bindings: dict[str, list[IPv4Interface]],
+    blocked: set[IPv4Network],
+    senders: Iterator[tuple[str, bytes, IPv4Address]],
 ) -> dict[IPv4Address, set[str]]:
-    bindings = _ipv4_bindings()
-    blocked = _blocked_networks(blacklist, bindings)
     excluded_ips = {IPv4Address("255.255.255.255")}
     for addresses in bindings.values():
         excluded_ips.update(binding.ip for binding in addresses)
@@ -148,7 +162,7 @@ def _candidates(
             binding.network.broadcast_address for binding in addresses if binding.network.prefixlen < 31
         )
     hosts: dict[IPv4Address, set[str]] = {}
-    for interface, mac, host in _listen_for_arp(listen_timeout):
+    for interface, mac, host in senders:
         if host in excluded_ips or host.is_unspecified or host.is_multicast or host.is_loopback:
             continue
         if any(host in network for network in blocked):
@@ -171,18 +185,14 @@ def discover_ssh_hosts(
     for name, value in (("listen_timeout", listen_timeout), ("probe_timeout", probe_timeout)):
         if not isfinite(value) or value <= 0:
             raise ConfigError(f"SSH autoconfig {name} must be a finite positive number of seconds")
-    if not sys.platform.startswith("linux"):
-        raise MessagingCapabilityError("SSH autoconfig requires a Linux host for Ethernet ARP capture")
-
     _logger.info("SSH autoconfig listening for ARP sources matching %r for %g s", source, listen_timeout)
     try:
-        candidates = _candidates(source, listen_timeout, blacklist)
-        timings = [
-            (min(_icmp_rtt(host, interface, probe_timeout) for interface in sorted(interfaces)), host)
-            for host, interfaces in candidates.items()
-        ]
+        timings = _discover_timings(source, listen_timeout, probe_timeout, blacklist)
     except PermissionError as exc:
-        raise MessagingCapabilityError("SSH autoconfig requires CAP_NET_RAW for ARP capture and ICMP timing") from exc
+        requirement = "access to Npcap and Windows IP Helper" if sys.platform == "win32" else "CAP_NET_RAW"
+        raise MessagingCapabilityError(
+            f"SSH autoconfig requires {requirement} for ARP capture and ICMP timing",
+        ) from exc
     except OSError as exc:
         raise ConfigError(f"SSH autoconfig network error: {exc}") from exc
     if not timings:
@@ -197,3 +207,31 @@ def discover_ssh_hosts(
         )
         hosts.append(str(host))
     return hosts
+
+
+def _discover_timings(
+    source: str,
+    listen_timeout: float,
+    probe_timeout: float,
+    blacklist: str | Sequence[str] | None,
+) -> list[tuple[float, IPv4Address]]:
+    if sys.platform == "win32":
+        from colosseum_messaging.ssh import _autoconfig_windows as windows
+
+        bindings, aliases = windows.adapter_bindings()
+        blocked = _blocked_networks(blacklist, bindings, aliases)
+        with closing(windows.arp_frames(bindings, listen_timeout)) as frames:
+            candidates = _candidates(source, bindings, blocked, _windows_arp_senders(frames))
+        return [
+            (min(windows.icmp_rtt(host, bindings[interface], probe_timeout) for interface in sorted(interfaces)), host)
+            for host, interfaces in candidates.items()
+        ]
+    if sys.platform.startswith("linux"):
+        bindings = _ipv4_bindings()
+        blocked = _blocked_networks(blacklist, bindings, {})
+        candidates = _candidates(source, bindings, blocked, _listen_for_arp(listen_timeout))
+        return [
+            (min(_icmp_rtt(host, interface, probe_timeout) for interface in sorted(interfaces)), host)
+            for host, interfaces in candidates.items()
+        ]
+    raise MessagingCapabilityError("SSH autoconfig requires a Linux or Windows host for Ethernet ARP capture")

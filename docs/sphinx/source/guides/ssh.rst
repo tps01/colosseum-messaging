@@ -148,7 +148,7 @@ Discover SSH hosts from ARP
 ---------------------------
 
 In a CLI-managed ``main``, populate the active SSH configuration from ARP
-traffic on the Linux host running Colosseum::
+traffic on the Linux or Windows host running Colosseum::
 
    store = col.messaging.ssh.autoconfig(
        source="Xilinx",
@@ -160,11 +160,15 @@ traffic on the Linux host running Colosseum::
 
 ``source`` is required. It matches a case-insensitive substring of the
 Ethernet source MAC address or its registered IEEE vendor name. The listener
-uses the sender IPv4 address from each ARP request or reply. The capture host
-needs raw socket access (``CAP_NET_RAW``).
+uses the sender IPv4 address from each ARP request or reply. On Linux the
+capture host needs raw socket access (``CAP_NET_RAW``). On Windows, install
+`Npcap <https://npcap.com/>`_ separately and ensure its service is running.
+Run Colosseum elevated if Npcap is configured for administrators only. If
+capture is unavailable, use explicit ``[messaging.ssh]`` configuration.
 
 Blacklist entries accept interface names, local IPv4 addresses, and IPv4
-CIDRs. An interface name or local address excludes the associated subnets.
+CIDRs. Windows accepts the adapter's friendly name or GUID. An interface
+name or local address excludes the associated subnets.
 The capture window defaults to 10 seconds, and the ICMP reply timeout defaults
 to one second per host and interface. The lowest measured round-trip time
 gets ``ssh_id=1``. Hosts without an ICMP reply follow responsive hosts.
