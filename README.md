@@ -40,6 +40,10 @@ when `platform = "windows"` is set in `[messaging.ssh]`. Shell defaults for
 `interpreter=` or use an explicit `.bat`/`.cmd`/`.ps1` script. Unsupported
 defaults raise `colosseum_messaging.exceptions.MessagingCapabilityError`.
 
+SSH autoconfig discovers IPv4 hosts from live ARP traffic. It requires
+raw socket access on Linux or a separate [Npcap installation](https://npcap.com/)
+on Windows. You can also configure SSH hosts explicitly in bench TOML.
+
 `auth = "auto"` (the default) accepts first-seen SSH host keys automatically
 and also connects to known hosts. An explicit `known_hosts` file stores newly
 accepted keys. `auth = "none"` keeps the existing requirement for trusted keys.

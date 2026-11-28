@@ -49,7 +49,8 @@ def autoconfig(
 
     Assign IDs from 1 in ascending ICMP round-trip time. Senders without an
     ICMP reply follow measured senders. Ties are ordered by numeric IPv4 address.
-    The capture host must run Linux with raw socket access (CAP_NET_RAW).
+    The capture host must run Linux with raw socket access (CAP_NET_RAW)
+    or Windows with Npcap installed and accessible.
 
     :param source: Case-insensitive substring of the Ethernet source MAC or its IEEE vendor name.
     :param username: Username for generated SSH rows. Defaults to the local username.

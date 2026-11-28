@@ -5,15 +5,17 @@ import struct
 import sys
 from ipaddress import IPv4Address, IPv4Interface
 from math import inf
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, call
 
 import colosseum as col
 import colosseum.context as context_module
 import pytest
 from colosseum.config.loader import ConfigError
+from colosseum_messaging.exceptions import MessagingCapabilityError
 from colosseum_messaging.ssh import _autoconfig
 
-pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux packet sockets")
+linux_only = pytest.mark.skipif(sys.platform != "linux", reason="Linux packet sockets")
 
 _XILINX_MAC = bytes.fromhex("000a35010203")
 _OTHER_MAC = bytes.fromhex("020102030405")
@@ -32,7 +34,7 @@ def _arp(host, *, interface="eth0", ethernet_source=_XILINX_MAC, sender_mac=None
         bytes(6),
         IPv4Address("192.168.1.100").packed,
     )
-    return payload, (interface, 0x0806, socket.PACKET_BROADCAST, 1, ethernet_source)
+    return payload, (interface, 0x0806, 1, 1, ethernet_source)  # Linux PACKET_BROADCAST
 
 
 @pytest.fixture
@@ -48,6 +50,7 @@ def active_config(monkeypatch, tmp_path):
     return context_module.get_context()
 
 
+@linux_only
 def test_arp_discovery_ranks_eligible_hosts_and_refreshes_ssh_clients(monkeypatch, active_config):
     monkeypatch.setattr(
         _autoconfig,
@@ -111,6 +114,7 @@ def test_arp_discovery_ranks_eligible_hosts_and_refreshes_ssh_clients(monkeypatc
     assert active_config.resource_cache == {"messaging:http:1": http_client}
 
 
+@linux_only
 def test_no_matches_leave_active_ssh_config_usable(monkeypatch, active_config):
     monkeypatch.setattr(_autoconfig, "_ipv4_bindings", lambda: {})
     monkeypatch.setattr(_autoconfig, "_listen_for_arp", lambda timeout: iter(()))
@@ -126,6 +130,7 @@ def test_no_matches_leave_active_ssh_config_usable(monkeypatch, active_config):
     ssh_client.close.assert_not_called()
 
 
+@linux_only
 def test_icmp_probe_times_only_the_matching_echo_reply(monkeypatch):
     probe = MagicMock()
     probe.__enter__.return_value = probe
@@ -143,3 +148,87 @@ def test_icmp_probe_times_only_the_matching_echo_reply(monkeypatch):
     (request,), _ = probe.send.call_args
     assert request[:2] == bytes((8, 0))
     assert sum(word for (word,) in struct.iter_unpack("!H", request)) % 0xFFFF == 0
+
+
+@pytest.mark.skipif(sys.platform not in {"linux", "win32"}, reason="ARP discovery dependencies")
+def test_windows_passive_discovery_uses_shared_filters_and_ranking(monkeypatch, active_config):
+    from colosseum_messaging.ssh import _autoconfig_windows as windows
+
+    monkeypatch.setattr(_autoconfig, "sys", SimpleNamespace(platform="win32"))
+    bindings = {
+        "a": [IPv4Interface("192.168.1.10/24")],
+        "b": [IPv4Interface("192.168.2.10/24")],
+    }
+    monkeypatch.setattr(windows, "adapter_bindings", lambda: (bindings, {"blocked adapter": "b"}))
+
+    def frames(bindings_arg, timeout):
+        assert bindings_arg is bindings
+        assert timeout == 2
+        for interface, host in [
+            ("a", "192.168.1.5"),
+            ("a", "192.168.1.3"),
+            ("a", "192.168.1.4"),
+            ("b", "192.168.1.4"),
+            ("a", "192.168.1.2"),
+            ("b", "192.168.2.7"),
+        ]:
+            yield interface, _XILINX_MAC, _arp(host)[0]
+        yield "a", _OTHER_MAC, _arp("192.168.1.6", ethernet_source=_OTHER_MAC)[0]
+        yield "a", _OTHER_MAC, _arp("192.168.1.7")[0]
+
+    def rtt(host, addresses, timeout):
+        assert timeout == 0.5
+        return {
+            IPv4Address("192.168.1.2"): inf,
+            IPv4Address("192.168.1.3"): 0.01,
+            IPv4Address("192.168.1.4"): 0.005 if addresses is bindings["b"] else inf,
+            IPv4Address("192.168.1.5"): 0.01,
+        }[host]
+
+    monkeypatch.setattr(windows, "arp_frames", frames)
+    monkeypatch.setattr(windows, "icmp_rtt", rtt)
+    store = col.messaging.ssh.autoconfig(
+        source="Xilinx",
+        username="bench",
+        blacklist="Blocked Adapter",
+        listen_timeout=2,
+        probe_timeout=0.5,
+    )
+    assert store is active_config.config
+    assert [(row["ssh_id"], row["host"]) for row in store.list_items("messaging.ssh")] == [
+        (1, "192.168.1.4"),
+        (2, "192.168.1.3"),
+        (3, "192.168.1.5"),
+        (4, "192.168.1.2"),
+    ]
+
+
+@pytest.mark.skipif(sys.platform not in {"linux", "win32"}, reason="ARP discovery dependencies")
+@pytest.mark.parametrize("failure", ["missing", "empty", "read"])
+def test_windows_discovery_failure_preserves_ssh_config(monkeypatch, active_config, failure):
+    from colosseum_messaging.ssh import _autoconfig_windows as windows
+
+    monkeypatch.setattr(_autoconfig, "sys", SimpleNamespace(platform="win32"))
+    monkeypatch.setattr(windows, "adapter_bindings", lambda: ({}, {}))
+    original = active_config.config
+    client = Mock()
+    active_config.resource_cache["messaging:ssh:1"] = client
+
+    if failure == "missing":
+        monkeypatch.setattr(windows.ct, "CDLL", Mock(side_effect=OSError("DLL not found")))
+        expected = (MessagingCapabilityError, "Install Npcap")
+    else:
+
+        def frames(_bindings, _timeout):
+            if failure == "read":
+                raise OSError("capture disconnected")
+            yield from ()
+
+        monkeypatch.setattr(windows, "arp_frames", frames)
+        expected = (ConfigError, "capture disconnected" if failure == "read" else "no matching IPv4 ARP senders")
+
+    with pytest.raises(expected[0], match=expected[1]):
+        col.messaging.ssh.autoconfig(source="Xilinx")
+    assert active_config.config is original
+    assert active_config.resource_cache["messaging:ssh:1"] is client
+    client.close.assert_not_called()
